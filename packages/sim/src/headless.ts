@@ -1,9 +1,11 @@
 import { Sim, defaultInput } from "./sim.ts";
 import {
   InputError,
+  type DrifterState,
   type InputFrame,
   type InputState,
   type Scenario,
+  type ShadeState,
   type Tuning,
   type Vec3,
 } from "./types.ts";
@@ -11,12 +13,17 @@ import {
 const isObj = (v: unknown): v is Record<string, unknown> =>
   typeof v === "object" && v !== null && !Array.isArray(v);
 const isNum = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v);
+const isNat = (v: unknown): v is number => isNum(v) && Number.isInteger(v) && v >= 0;
 
 function vec3(v: unknown, what: string): Vec3 {
   if (!Array.isArray(v) || v.length !== 3 || !v.every(isNum))
     throw new InputError(`${what}: expected [x, y, z] numbers`);
   return [v[0] as number, v[1] as number, v[2] as number];
 }
+
+const SHADE_STATES: ShadeState[] = ["spawning", "wander", "chase", "recoil", "stunned"];
+const DRIFTER_STATES: DrifterState[] = ["idle", "chase", "flee", "removed"];
+const BUTTONS = ["jump", "interact", "pulse", "dash", "pause"] as const;
 
 export function parseInputs(raw: unknown): InputFrame[] {
   if (!isObj(raw) || !Array.isArray(raw.frames))
@@ -26,8 +33,7 @@ export function parseInputs(raw: unknown): InputFrame[] {
     const w = `inputs.frames[${i}]`;
     if (!isObj(f)) throw new InputError(`${w}: expected an object`);
     const tick = f.tick;
-    if (!isNum(tick) || !Number.isInteger(tick) || tick < 0)
-      throw new InputError(`${w}.tick: expected a non-negative integer`);
+    if (!isNat(tick)) throw new InputError(`${w}.tick: expected a non-negative integer`);
     if (tick <= last) throw new InputError(`${w}.tick: must be strictly increasing`);
     last = tick;
     const out: InputFrame = { tick };
@@ -43,10 +49,10 @@ export function parseInputs(raw: unknown): InputFrame[] {
       if (!isNum(f.cam_yaw_deg)) throw new InputError(`${w}.cam_yaw_deg: expected a number`);
       out.cam_yaw_deg = f.cam_yaw_deg;
     }
-    for (const k of ["jump", "interact", "pulse"] as const) {
+    for (const k of BUTTONS) {
       if (f[k] !== undefined) {
         if (typeof f[k] !== "boolean") throw new InputError(`${w}.${k}: expected a boolean`);
-        out[k] = f[k];
+        out[k] = f[k] as boolean;
       }
     }
     return out;
@@ -61,15 +67,22 @@ export function parseScenario(raw: unknown): Scenario {
     const p = raw.player;
     s.player = {};
     if (p.pos !== undefined) s.player.pos = vec3(p.pos, "scenario.player.pos");
-    for (const k of ["carried", "flames"] as const) {
+    for (const k of [
+      "carried",
+      "flames",
+      "invuln_ticks",
+      "dash_cd_ticks",
+      "pulse_cd_ticks",
+      "charm_ticks",
+    ] as const) {
       if (p[k] !== undefined) {
-        if (!isNum(p[k]) || !Number.isInteger(p[k]) || (p[k] as number) < 0)
+        if (!isNat(p[k]))
           throw new InputError(`scenario.player.${k}: expected a non-negative integer`);
         s.player[k] = p[k] as number;
       }
     }
   }
-  for (const k of ["random_motes", "random_shades"] as const) {
+  for (const k of ["random_motes", "random_shades", "random_drifters", "wind_enabled"] as const) {
     if (raw[k] !== undefined) {
       if (typeof raw[k] !== "boolean") throw new InputError(`scenario.${k}: expected a boolean`);
       s[k] = raw[k] as boolean;
@@ -82,14 +95,73 @@ export function parseScenario(raw: unknown): Scenario {
   if (raw.shades !== undefined) {
     if (!Array.isArray(raw.shades)) throw new InputError("scenario.shades: expected an array");
     s.shades = raw.shades.map((x, i) => {
-      if (!isObj(x)) throw new InputError(`scenario.shades[${i}]: expected an object`);
-      const o: { id?: string; pos?: Vec3 } = {};
+      const w = `scenario.shades[${i}]`;
+      if (!isObj(x)) throw new InputError(`${w}: expected an object`);
+      const o: NonNullable<Scenario["shades"]>[number] = {};
       if (x.id !== undefined) {
-        if (typeof x.id !== "string")
-          throw new InputError(`scenario.shades[${i}].id: expected a string`);
+        if (typeof x.id !== "string") throw new InputError(`${w}.id: expected a string`);
         o.id = x.id;
       }
-      if (x.pos !== undefined) o.pos = vec3(x.pos, `scenario.shades[${i}].pos`);
+      if (x.pos !== undefined) o.pos = vec3(x.pos, `${w}.pos`);
+      if (x.state !== undefined) {
+        if (!SHADE_STATES.includes(x.state as ShadeState))
+          throw new InputError(`${w}.state: expected one of ${SHADE_STATES.join(", ")}`);
+        o.state = x.state as ShadeState;
+      }
+      if (x.state_ticks_left !== undefined) {
+        if (!isNat(x.state_ticks_left))
+          throw new InputError(`${w}.state_ticks_left: expected a non-negative integer`);
+        o.state_ticks_left = x.state_ticks_left;
+      }
+      return o;
+    });
+  }
+  if (raw.drifters !== undefined) {
+    if (!Array.isArray(raw.drifters)) throw new InputError("scenario.drifters: expected an array");
+    s.drifters = raw.drifters.map((x, i) => {
+      const w = `scenario.drifters[${i}]`;
+      if (!isObj(x)) throw new InputError(`${w}: expected an object`);
+      const o: NonNullable<Scenario["drifters"]>[number] = {};
+      if (x.id !== undefined) {
+        if (typeof x.id !== "string") throw new InputError(`${w}.id: expected a string`);
+        o.id = x.id;
+      }
+      if (x.pos !== undefined) o.pos = vec3(x.pos, `${w}.pos`);
+      if (x.state !== undefined) {
+        if (!DRIFTER_STATES.includes(x.state as DrifterState))
+          throw new InputError(`${w}.state: expected one of ${DRIFTER_STATES.join(", ")}`);
+        o.state = x.state as DrifterState;
+      }
+      for (const k of ["stolen", "state_ticks_left"] as const) {
+        if (x[k] !== undefined) {
+          if (!isNat(x[k])) throw new InputError(`${w}.${k}: expected a non-negative integer`);
+          o[k] = x[k] as number;
+        }
+      }
+      return o;
+    });
+  }
+  if (raw.charms !== undefined) {
+    if (!Array.isArray(raw.charms)) throw new InputError("scenario.charms: expected an array");
+    s.charms = raw.charms.map((x, i) => {
+      const w = `scenario.charms[${i}]`;
+      if (!isObj(x)) throw new InputError(`${w}: expected an object`);
+      const o: NonNullable<Scenario["charms"]>[number] = {};
+      if (x.id !== undefined) {
+        if (typeof x.id !== "string") throw new InputError(`${w}.id: expected a string`);
+        o.id = x.id;
+      }
+      if (x.pos !== undefined) o.pos = vec3(x.pos, `${w}.pos`);
+      if (x.available !== undefined) {
+        if (typeof x.available !== "boolean")
+          throw new InputError(`${w}.available: expected a boolean`);
+        o.available = x.available;
+      }
+      if (x.respawn_ticks !== undefined) {
+        if (!isNat(x.respawn_ticks))
+          throw new InputError(`${w}.respawn_ticks: expected a non-negative integer`);
+        o.respawn_ticks = x.respawn_ticks;
+      }
       return o;
     });
   }
@@ -125,6 +197,7 @@ export interface HeadlessOptions {
   tuning: Tuning;
   seed: number;
   ticks: number;
+  night?: number;
   snapshotEvery?: number;
   scenario?: Scenario;
   inputs?: InputFrame[];
@@ -133,7 +206,7 @@ export interface HeadlessOptions {
 /** Runs the sim headless and returns the JSONL lines (without trailing newlines). */
 export function runHeadless(o: HeadlessOptions): string[] {
   const every = o.snapshotEvery ?? 10;
-  const sim = new Sim(o.tuning, o.seed, o.scenario);
+  const sim = new Sim(o.tuning, o.seed, o.scenario, o.night ?? 1);
   const frames = o.inputs ?? [];
   const input: InputState = defaultInput();
   const lines: string[] = [];
@@ -145,19 +218,27 @@ export function runHeadless(o: HeadlessOptions): string[] {
   };
 
   snap(); // tick 0: after scenario setup, before inputs
-  for (let k = 0; k < o.ticks && sim.state === "playing"; k++) {
+  lines.push(JSON.stringify(sim.nightStartEvent()));
+  for (let k = 0; k < o.ticks && !sim.outcome; k++) {
     while (fi < frames.length && frames[fi]!.tick <= k) {
       const f = frames[fi++]!;
       if (f.move) input.move = f.move;
       if (f.cam_yaw_deg !== undefined) input.cam_yaw_deg = f.cam_yaw_deg;
-      if (f.jump !== undefined) input.jump = f.jump;
-      if (f.interact !== undefined) input.interact = f.interact;
-      if (f.pulse !== undefined) input.pulse = f.pulse;
+      for (const b of ["jump", "interact", "pulse", "dash", "pause"] as const) {
+        if (f[b] !== undefined) input[b] = f[b];
+      }
     }
     for (const e of sim.step(input)) lines.push(JSON.stringify(e));
     if (sim.tick % every === 0) snap();
   }
   if (lastSnap !== sim.tick) snap(); // always end on the final state
-  lines.push(JSON.stringify({ type: "end", ticks: sim.tick, state: sim.state, score: sim.score }));
+  lines.push(
+    JSON.stringify({
+      type: "end",
+      ticks: sim.tick,
+      state: sim.outcome ?? (sim.paused ? "paused" : "playing"),
+      score: sim.score,
+    }),
+  );
   return lines;
 }

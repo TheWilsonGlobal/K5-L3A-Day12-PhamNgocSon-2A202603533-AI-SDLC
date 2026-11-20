@@ -1,111 +1,158 @@
 import * as THREE from "three";
-import { ISLAND_RADIUS, type Sim, type Tuning } from "@ddl/sim";
+import type { Sim, Tuning } from "@ddl/sim";
+import type { TerrainImage } from "./world.ts";
 
-export const MINIMAP_SIZE = 200;
+export const MINIMAP_SIZE = 180;
+const VIEW_RADIUS_M = 42;
 
 /**
- * Minimap: the whole island, rotated about its centre so the camera's forward
- * direction points up. Forward = (sin yaw, cos yaw), right = (-cos yaw, sin yaw).
+ * Minimap: a window of ~42 m around Mây, rotated so the camera's forward direction points up.
+ * Forward = (sin yaw, cos yaw), right = (-cos yaw, sin yaw).
  */
 export function drawMinimap(
   ctx: CanvasRenderingContext2D,
   sim: Sim,
   yaw: number,
   T: Tuning,
+  terrain: TerrainImage,
   help: boolean,
 ): void {
   const S = MINIMAP_SIZE;
   const c = S / 2;
-  const scale = (c - 8) / ISLAND_RADIUS;
+  const scale = (c - 6) / VIEW_RADIUS_M;
   const fx = Math.sin(yaw);
   const fz = Math.cos(yaw);
   const rx = -Math.cos(yaw);
   const rz = Math.sin(yaw);
+  const px = sim.pos[0];
+  const pz = sim.pos[2];
   const map = (x: number, z: number): [number, number] => [
-    c + (x * rx + z * rz) * scale,
-    c - (x * fx + z * fz) * scale,
+    c + ((x - px) * rx + (z - pz) * rz) * scale,
+    c - ((x - px) * fx + (z - pz) * fz) * scale,
   ];
 
   ctx.clearRect(0, 0, S, S);
-  ctx.fillStyle = "rgba(20, 12, 40, 0.78)";
+  ctx.save();
   ctx.beginPath();
   ctx.arc(c, c, c - 2, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.strokeStyle = "rgba(255, 176, 74, 0.5)";
-  ctx.lineWidth = 2;
-  ctx.stroke();
+  ctx.clip();
+  ctx.fillStyle = "rgba(8, 12, 30, 0.9)";
+  ctx.fillRect(0, 0, S, S);
 
-  // safe zones around lit lanterns
+  // terrain, drawn in world metres through the same rotation
+  ctx.save();
+  ctx.setTransform(
+    rx * scale,
+    -fx * scale,
+    rz * scale,
+    -fz * scale,
+    c - (rx * px + rz * pz) * scale,
+    c + (fx * px + fz * pz) * scale,
+  );
+  ctx.drawImage(terrain.canvas, terrain.minX, terrain.minZ, terrain.widthM, terrain.heightM);
+  ctx.restore();
+
   for (const l of sim.lanterns) {
     if (!l.lit) continue;
     const [x, y] = map(l.pos[0], l.pos[2]);
-    ctx.fillStyle = "rgba(255, 167, 58, 0.16)";
+    ctx.fillStyle = "rgba(255, 179, 71, 0.16)";
     ctx.beginPath();
     ctx.arc(x, y, T.safe_radius * scale, 0, Math.PI * 2);
     ctx.fill();
   }
-
-  // fireflies
-  ctx.fillStyle = "#fff08a";
   for (const m of sim.motes) {
     const [x, y] = map(m.pos[0], m.pos[2]);
-    ctx.fillRect(x - 1.5, y - 1.5, 3, 3);
+    ctx.fillStyle = "#1c2440";
+    ctx.fillRect(x - 3, y - 3, 6, 6);
+    ctx.fillStyle = "#fff6a0";
+    ctx.fillRect(x - 2, y - 2, 4, 4);
+  }
+  for (const ch of sim.charms) {
+    if (!ch.available) continue;
+    const [x, y] = map(ch.pos[0], ch.pos[2]);
+    ctx.fillStyle = "#c8102e";
+    ctx.strokeStyle = "#f2c14e";
+    ctx.lineWidth = 1.5;
+    ctx.fillRect(x - 3, y - 4, 6, 8);
+    ctx.strokeRect(x - 3, y - 4, 6, 8);
   }
 
-  // lanterns
-  ctx.font = "bold 11px system-ui, sans-serif";
+  ctx.font = "bold 10px system-ui, sans-serif";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   for (const l of sim.lanterns) {
     const [x, y] = map(l.pos[0], l.pos[2]);
     ctx.beginPath();
-    ctx.arc(x, y, 8, 0, Math.PI * 2);
-    ctx.fillStyle = l.lit ? "#ffc35a" : "#2a2145";
+    ctx.arc(x, y, 7, 0, Math.PI * 2);
+    ctx.fillStyle = l.lit ? "#ffb347" : "#2a2f4a";
     ctx.fill();
     ctx.lineWidth = 2;
-    ctx.strokeStyle = l.lit ? "#fff2c8" : "#9a86d8";
+    ctx.strokeStyle = l.lit ? "#fff3c8" : "#e4e8ff";
     ctx.stroke();
     if (!l.lit && l.deposited > 0) {
       ctx.beginPath();
-      ctx.arc(x, y, 8, -Math.PI / 2, -Math.PI / 2 + (l.deposited / T.lantern_cost) * Math.PI * 2);
-      ctx.strokeStyle = "#ffb04a";
+      ctx.arc(x, y, 7, -Math.PI / 2, -Math.PI / 2 + (l.deposited / T.lantern_cost) * Math.PI * 2);
+      ctx.strokeStyle = "#ffb347";
       ctx.stroke();
     }
-    ctx.fillStyle = l.lit ? "#3a2200" : "#d8cfff";
+    ctx.fillStyle = l.lit ? "#3a2200" : "#d8d8e8";
     ctx.fillText(l.id.slice(1), x, y + 0.5);
   }
-
-  // shades
   for (const s of sim.shades) {
     const [x, y] = map(s.pos[0], s.pos[2]);
     ctx.beginPath();
-    ctx.arc(x, y, 5, 0, Math.PI * 2);
-    ctx.fillStyle = s.state === "stunned" ? "#4a8aff" : "#a23cff";
+    ctx.arc(x, y, 4.5, 0, Math.PI * 2);
+    ctx.fillStyle = s.state === "stunned" ? "#6a6a98" : "#7a3cff";
     ctx.fill();
     ctx.strokeStyle = "#ffffff88";
     ctx.lineWidth = 1;
     ctx.stroke();
   }
+  for (const d of sim.drifters) {
+    const [x, y] = map(d.pos[0], d.pos[2]);
+    ctx.strokeStyle = "#8fa3b8";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(x - 5, y + 2);
+    ctx.quadraticCurveTo(x, y - 4, x + 5, y + 2);
+    ctx.stroke();
+  }
 
-  // player: triangle pointing at the direction of travel's reference (up = camera forward)
-  const [px, py] = map(sim.pos[0], sim.pos[2]);
+  // Mây at the centre
   ctx.fillStyle = "#ffffff";
   ctx.beginPath();
-  ctx.moveTo(px, py - 7);
-  ctx.lineTo(px + 5, py + 5);
-  ctx.lineTo(px - 5, py + 5);
+  ctx.moveTo(c, c - 7);
+  ctx.lineTo(c + 5, c + 5);
+  ctx.lineTo(c - 5, c + 5);
   ctx.closePath();
   ctx.fill();
-  ctx.strokeStyle = "#ffa73a";
+  ctx.strokeStyle = "#ffb347";
   ctx.lineWidth = 1.5;
   ctx.stroke();
+  ctx.restore();
 
+  ctx.strokeStyle = "rgba(242, 193, 78, 0.55)";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(c, c, c - 2, 0, Math.PI * 2);
+  ctx.stroke();
   if (help) {
-    ctx.fillStyle = "#ffe9c2";
+    ctx.fillStyle = "#f5f1e6";
     ctx.font = "10px system-ui, sans-serif";
+    ctx.textAlign = "center";
     ctx.fillText("↑ hướng camera", c, 12);
   }
 }
+
+const STATE_VI: Record<string, string> = {
+  spawning: "đang hiện ra",
+  wander: "lang thang",
+  chase: "đang đuổi",
+  recoil: "lùi lại",
+  stunned: "bị choáng",
+  idle: "lượn chậm",
+  flee: "bay trốn",
+};
 
 interface LabelSpec {
   id: string;
@@ -127,7 +174,7 @@ export function updateLabels(
 ): void {
   const specs: LabelSpec[] = [];
   const near = (x: number, z: number, r: number) => Math.hypot(x - sim.pos[0], z - sim.pos[2]) <= r;
-  // Lantern progress badge is always on ("2/4" or "✔"); H expands it to a full sentence.
+  // Lantern progress badge is always on ("4/10" or "✔"); H expands it to a sentence.
   for (const l of sim.lanterns) {
     const inRange = near(l.pos[0], l.pos[2], T.interact_radius);
     const short = l.lit ? "✔ sáng" : `${l.deposited}/${T.lantern_cost}`;
@@ -136,7 +183,7 @@ export function updateLabels(
       : `${l.deposited}/${T.lantern_cost} đom đóm${inRange ? " · nhấn E để nạp" : ""}`;
     specs.push({
       id: `l-${l.id}`,
-      pos: [l.pos[0], 5.6, l.pos[2]],
+      pos: [l.pos[0], l.pos[1] + 5.6, l.pos[2]],
       text: help ? `Đèn ${l.id} · ${full}` : `${l.id} · ${short}`,
       cls: l.lit ? "lit" : "lantern",
     });
@@ -151,12 +198,31 @@ export function updateLabels(
     for (const s of sim.shades)
       specs.push({
         id: `s-${s.id}`,
-        pos: [s.pos[0], 2.2, s.pos[2]],
-        text: `Bóng Mực ${s.id} · ${s.state === "stunned" ? "bị choáng" : "đang đuổi — nhấn F để xua"}`,
+        pos: [s.pos[0], s.pos[1] + 1.4, s.pos[2]],
+        text: `Bóng Mực ${s.id} · ${STATE_VI[s.state]}${s.state === "chase" ? " — nhấn F để xua" : ""}`,
         cls: "shade",
       });
+    for (const d of sim.drifters)
+      specs.push({
+        id: `d-${d.id}`,
+        pos: [d.pos[0], d.pos[1] + 0.9, d.pos[2]],
+        text: `Gió Lạc ${d.id} · ${STATE_VI[d.state]}${d.stolen ? ` · giữ ${d.stolen} đom đóm` : ""}`,
+        cls: "drifter",
+      });
+    for (const c of sim.charms)
+      specs.push({
+        id: `c-${c.id}`,
+        pos: [c.pos[0], c.pos[1] + 2.2, c.pos[2]],
+        text: `Bùa Gió ${c.id} · ${c.available ? "chạy nhanh + lướt liên tục" : `hồi sau ${Math.ceil(c.respawn / 60)}s`}`,
+        cls: "charm",
+      });
     for (const m of sim.motes)
-      specs.push({ id: `m-${m.id}`, pos: [m.pos[0], 1.3, m.pos[2]], text: "Đom đóm", cls: "mote" });
+      specs.push({
+        id: `m-${m.id}`,
+        pos: [m.pos[0], m.pos[1] + 1.3, m.pos[2]],
+        text: m.kind === "dropped" ? "Đom đóm rơi" : "Đom đóm",
+        cls: "mote",
+      });
   }
 
   const seen = new Set<string>();
@@ -183,4 +249,43 @@ export function updateLabels(
       pool.delete(id);
     }
   }
+}
+
+/** Arrow at the screen edge pointing to the nearest unlit lantern when it is off screen. */
+export function updateArrow(el: HTMLElement, sim: Sim, camera: THREE.Camera): void {
+  let best: Sim["lanterns"][number] | undefined;
+  let bestD = Infinity;
+  for (const l of sim.lanterns) {
+    if (l.lit) continue;
+    const d = Math.hypot(l.pos[0] - sim.pos[0], l.pos[1] - sim.pos[1], l.pos[2] - sim.pos[2]);
+    if (d < bestD) {
+      bestD = d;
+      best = l;
+    }
+  }
+  if (!best || sim.outcome) {
+    el.style.display = "none";
+    return;
+  }
+  v.set(best.pos[0], best.pos[1] + 4.4, best.pos[2]).project(camera);
+  const behind = v.z > 1;
+  let nx = behind ? -v.x : v.x;
+  let ny = behind ? -v.y : v.y;
+  const inside = !behind && Math.abs(v.x) <= 0.94 && Math.abs(v.y) <= 0.9;
+  if (inside) {
+    el.style.display = "none";
+    return;
+  }
+  const m = Math.max(Math.abs(nx) / 0.9, Math.abs(ny) / 0.82, 1e-6);
+  nx /= m;
+  ny /= m;
+  const w = window.innerWidth;
+  const h = window.innerHeight;
+  el.style.display = "flex";
+  el.style.transform = `translate(${((nx * 0.9 + 1) / 2) * w}px, ${((1 - ny * 0.82) / 2) * h}px) translate(-50%, -50%)`;
+  const ang = Math.atan2(nx * w, ny * h); // clockwise from "up" toward the lantern
+  const tip = el.querySelector<HTMLElement>(".tip");
+  if (tip) tip.style.transform = `rotate(${ang}rad)`;
+  const lab = el.querySelector<HTMLElement>(".dist");
+  if (lab) lab.textContent = `${best.id} · ${Math.round(bestD)} m`;
 }

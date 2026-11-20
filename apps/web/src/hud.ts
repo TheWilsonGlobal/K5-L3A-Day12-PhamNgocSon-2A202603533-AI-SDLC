@@ -3,69 +3,67 @@ import type { Sim, Tuning } from "@ddl/sim";
 const ICON = {
   flame:
     '<svg viewBox="0 0 24 24"><path d="M12 2c.9 3.6 5.2 5.6 5.2 10.6A5.2 5.2 0 0 1 6.8 13c0-2.1 1-3.3 2.1-4.4.3 1.5 1 2.1 1.9 2.3C10.5 8 10.8 4.6 12 2z"/></svg>',
-  spark:
-    '<svg viewBox="0 0 24 24"><path d="M12 2l2.2 7.8L22 12l-7.8 2.2L12 22l-2.2-7.8L2 12l7.8-2.2z"/></svg>',
   clock:
     '<svg viewBox="0 0 24 24"><circle cx="12" cy="13" r="8" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 8.5V13l3 2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M9 2.5h6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>',
   star: '<svg viewBox="0 0 24 24"><path d="M12 2l3 6.5 7 .8-5.2 4.8 1.5 7L12 17.5 5.7 21l1.5-7L2 9.3l7-.8z"/></svg>',
+  lantern:
+    '<svg viewBox="0 0 24 24"><path d="M10 2h4v2.2h-4zM8.2 5.2h7.6L18 8.4v7.2L15.8 19H8.2L6 15.6V8.4zM10 19.8h4V22h-4z"/></svg>',
+  dash: '<svg viewBox="0 0 24 24"><path d="M3 8h9M1 12h12M3 16h9" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M14 5l8 7-8 7z"/></svg>',
   pulse:
-    '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3" /><circle cx="12" cy="12" r="7" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="10.5" fill="none" stroke="currentColor" stroke-width="1.2" opacity=".6"/></svg>',
+    '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="7" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="10.5" fill="none" stroke="currentColor" stroke-width="1.2" opacity=".6"/></svg>',
+  charm:
+    '<svg viewBox="0 0 24 24"><rect x="6" y="2" width="12" height="17" rx="2"/><circle cx="12" cy="10" r="3" fill="none" stroke="#f2c14e" stroke-width="1.6"/><path d="M12 19v3" stroke="currentColor" stroke-width="2"/></svg>',
 };
-
-const lanternSvg = (i: number) =>
-  `<svg viewBox="0 0 24 24"><defs><linearGradient id="hl${i}" x1="0" y1="1" x2="0" y2="0">` +
-  `<stop id="hla${i}" offset="0" stop-color="#ffc35a"/><stop id="hlb${i}" offset="0" stop-color="#3a2f66"/>` +
-  `</linearGradient></defs><path fill="url(#hl${i})" d="M10 2h4v2.2h-4zM8.2 5.2h7.6L18 8.4v7.2L15.8 19H8.2L6 15.6V8.4zM10 19.8h4V22h-4z"/>` +
-  `<path fill="none" stroke="#9a86d8" stroke-width="1" d="M8.2 5.2h7.6L18 8.4v7.2L15.8 19H8.2L6 15.6V8.4z"/></svg>`;
 
 export interface Hud {
   update(sim: Sim, helpLabels: boolean): void;
   reset(): void;
 }
 
-/** Game-style HUD: flames, fireflies, lanterns, time bar, score, pulse cooldown and an E prompt. */
+/**
+ * HUD in the ticket's layout: flames (top left), clock (top centre), lanterns + score (top right),
+ * a 10-cell firefly bar (bottom centre), dash / pulse cooldowns and the charm (bottom right),
+ * and an "E" prompt near an unlit lantern.
+ */
 export function createHud(root: HTMLElement, promptEl: HTMLElement, T: Tuning): Hud {
   const flames = Array.from(
     { length: T.flames },
     () => `<i class="ic flame">${ICON.flame}</i>`,
   ).join("");
-  const pips = Array.from({ length: T.carry_capacity }, () => '<i class="pip"></i>').join("");
-  const lanterns = Array.from(
-    { length: T.lantern_count_night1 },
-    (_, i) => `<i class="ic lantern">${lanternSvg(i)}</i>`,
-  ).join("");
+  const cells = Array.from({ length: T.carry_capacity }, () => '<i class="cell"></i>').join("");
 
   root.innerHTML = `
-    <div class="hud-card">
-      <div class="hud-row"><span class="lab">Ngọn lửa</span><span class="icons" data-r="flames">${flames}</span></div>
-      <div class="hud-row"><span class="lab">Đom đóm</span><span class="pips" data-r="pips">${pips}</span><b class="val" data-r="carryN"></b></div>
-      <div class="hud-row"><span class="lab">Đèn lồng</span><span class="icons" data-r="lanterns">${lanterns}</span><b class="val" data-r="lit"></b></div>
-      <div class="hud-time" data-r="timeBox"><i class="ic">${ICON.clock}</i><b data-r="time"></b><div class="bar"><i data-r="timeBar"></i></div></div>
-      <div class="hud-bottom">
-        <div class="score"><i class="ic">${ICON.star}</i><b data-r="score">0</b></div>
-        <div class="pulse" data-r="pulseBox"><i class="ic">${ICON.pulse}</i><span class="lab">Xung sáng <kbd>F</kbd></span><div class="bar"><i data-r="pulseBar"></i></div><span class="state" data-r="pulseState"></span></div>
-      </div>
-      <div class="hud-keys"><kbd>P</kbd> Hướng dẫn <kbd>H</kbd> Nhãn<span data-r="hOn"></span></div>
-    </div>`;
+    <div class="z tl"><span class="lab">Ngọn Lửa</span><span class="flames" data-r="flames">${flames}</span></div>
+    <div class="z tc" data-r="timeBox"><i class="ic">${ICON.clock}</i><b data-r="time"></b></div>
+    <div class="z tr">
+      <div class="lamps"><i class="ic">${ICON.lantern}</i><span class="lab">Đèn</span><b data-r="lit"></b></div>
+      <div class="score"><i class="ic">${ICON.star}</i><b data-r="score">0</b></div>
+    </div>
+    <div class="z bc"><div class="fbar" data-r="cells">${cells}</div><div class="fcount"><span class="lab">Đom đóm</span> <b data-r="carryN"></b></div></div>
+    <div class="z br">
+      <div class="cd" data-r="charmBox"><div class="ring"><i class="ic">${ICON.charm}</i></div><span class="nm">Bùa Gió</span><span class="st" data-r="charmSt"></span></div>
+      <div class="cd" data-r="dashBox"><div class="ring"><i class="ic">${ICON.dash}</i></div><span class="nm">Lướt <kbd>Shift</kbd></span><span class="st" data-r="dashSt"></span></div>
+      <div class="cd" data-r="pulseBox"><div class="ring"><i class="ic">${ICON.pulse}</i></div><span class="nm">Tỏa Sáng <kbd>F</kbd></span><span class="st" data-r="pulseSt"></span></div>
+    </div>
+    <div class="keys"><kbd>Esc</kbd>/<kbd>P</kbd> Tạm dừng · <kbd>H</kbd> Nhãn<span data-r="hOn"></span></div>`;
 
-  const q = <T extends HTMLElement>(k: string) => root.querySelector<T>(`[data-r="${k}"]`)!;
+  const q = <E extends HTMLElement>(k: string) => root.querySelector<E>(`[data-r="${k}"]`)!;
   const flameEls = Array.from(q("flames").children) as HTMLElement[];
-  const pipEls = Array.from(q("pips").children) as HTMLElement[];
-  const lanternEls = Array.from(q("lanterns").children) as HTMLElement[];
+  const cellEls = Array.from(q("cells").children) as HTMLElement[];
   const el = {
-    carryN: q("carryN"),
-    lit: q("lit"),
     time: q("time"),
     timeBox: q("timeBox"),
-    timeBar: q("timeBar"),
+    lit: q("lit"),
     score: q("score"),
+    carryN: q("carryN"),
+    charmBox: q("charmBox"),
+    charmSt: q("charmSt"),
+    dashBox: q("dashBox"),
+    dashSt: q("dashSt"),
     pulseBox: q("pulseBox"),
-    pulseBar: q("pulseBar"),
-    pulseState: q("pulseState"),
+    pulseSt: q("pulseSt"),
     hOn: q("hOn"),
   };
-  const gradA = lanternEls.map((_, i) => root.querySelector<SVGStopElement>(`#hla${i}`)!);
-  const gradB = lanternEls.map((_, i) => root.querySelector<SVGStopElement>(`#hlb${i}`)!);
 
   const cache = new Map<string, string>();
   const setText = (key: string, node: HTMLElement, v: string) => {
@@ -82,6 +80,13 @@ export function createHud(root: HTMLElement, promptEl: HTMLElement, T: Tuning): 
       node.classList.toggle(cls, on);
     }
   };
+  const ring = (box: HTMLElement, frac: number) => {
+    const v = frac.toFixed(2);
+    if (box.dataset.p !== v) {
+      box.dataset.p = v;
+      box.style.setProperty("--p", v);
+    }
+  };
   let lastScore = 0;
 
   return {
@@ -91,36 +96,19 @@ export function createHud(root: HTMLElement, promptEl: HTMLElement, T: Tuning): 
     },
     update(sim, helpLabels) {
       flameEls.forEach((f, i) => setCls(`f${i}`, f, "off", i >= sim.flames));
-      pipEls.forEach((p, i) => setCls(`p${i}`, p, "on", i < sim.carried));
+      cellEls.forEach((c, i) => setCls(`c${i}`, c, "on", i < sim.carried));
       setText("carryN", el.carryN, `${sim.carried}/${T.carry_capacity}`);
 
-      let lit = 0;
-      sim.lanterns.forEach((l, i) => {
-        const frac = l.lit ? 1 : Math.min(1, l.deposited / T.lantern_cost);
-        if (l.lit) lit++;
-        const a = gradA[i];
-        const b = gradB[i];
-        const k = `g${i}`;
-        const v = String(frac);
-        if (a && b && cache.get(k) !== v) {
-          cache.set(k, v);
-          a.setAttribute("offset", String(frac));
-          b.setAttribute("offset", String(frac));
-        }
-        const node = lanternEls[i];
-        if (node) {
-          setCls(`l${i}`, node, "lit", l.lit);
-          setCls(`l${i}`, node, "part", !l.lit && frac > 0);
-        }
-      });
-      setText("lit", el.lit, `${lit}/${sim.lanterns.length}`);
-
       const left = Math.ceil(sim.timeLeft);
-      setText("time", el.time, `${Math.floor(left / 60)}:${String(left % 60).padStart(2, "0")}`);
-      const tf = sim.timeLeft / T.night1_duration_s;
-      el.timeBar.style.width = `${Math.max(0, Math.min(1, tf)) * 100}%`;
+      setText(
+        "time",
+        el.time,
+        `${String(Math.floor(left / 60)).padStart(2, "0")}:${String(left % 60).padStart(2, "0")}`,
+      );
       setCls("time", el.timeBox, "low", sim.timeLeft <= 30);
 
+      const lit = sim.lanterns.filter((l) => l.lit).length;
+      setText("lit", el.lit, `${lit}/${sim.lanterns.length}`);
       if (sim.score !== lastScore) {
         lastScore = sim.score;
         el.score.textContent = String(sim.score);
@@ -129,27 +117,45 @@ export function createHud(root: HTMLElement, promptEl: HTMLElement, T: Tuning): 
         el.score.classList.add("bump");
       }
 
-      const noLight = sim.carried < T.pulse_cost;
-      const cooling = sim.pulseCd > 0;
-      el.pulseBar.style.width = `${(cooling ? 1 - sim.pulseCd / T.pulse_cooldown_s : 1) * 100}%`;
-      setCls("pulse", el.pulseBox, "ready", !cooling && !noLight);
-      setCls("pulse", el.pulseBox, "wait", cooling || noLight);
+      // dash: ready fraction from the cooldown (a charm removes it)
+      const dashTotal = T.dash_cooldown_s * 60;
+      ring(el.dashBox, sim.dashCd > 0 ? 1 - sim.dashCd / dashTotal : 1);
+      setCls("dash", el.dashBox, "ready", sim.dashCd === 0);
       setText(
-        "pulseState",
-        el.pulseState,
-        cooling ? `${sim.pulseCd.toFixed(1)}s` : noLight ? "cần đom đóm" : "sẵn sàng",
+        "dashSt",
+        el.dashSt,
+        sim.dashCd > 0 ? `${(sim.dashCd / 60).toFixed(1)}s` : "sẵn sàng",
       );
+
+      const noLight = sim.carried < T.pulse_cost;
+      const pulseTotal = T.pulse_cooldown_s * 60;
+      ring(el.pulseBox, sim.pulseCd > 0 ? 1 - sim.pulseCd / pulseTotal : 1);
+      setCls("pulse", el.pulseBox, "ready", sim.pulseCd === 0 && !noLight);
+      setCls("pulse", el.pulseBox, "wait", sim.pulseCd > 0 || noLight);
+      setText(
+        "pulseSt",
+        el.pulseSt,
+        sim.pulseCd > 0
+          ? `${(sim.pulseCd / 60).toFixed(1)}s`
+          : noLight
+            ? `cần ${T.pulse_cost}`
+            : "sẵn sàng",
+      );
+
+      setCls("charm", el.charmBox, "gone", sim.charm === 0);
+      ring(el.charmBox, sim.charm / 600);
+      setText("charmSt", el.charmSt, sim.charm > 0 ? `${(sim.charm / 60).toFixed(1)}s` : "—");
       setText("hOn", el.hOn, helpLabels ? " · đang bật" : "");
 
       const near = sim.lanterns.find(
         (l) =>
           !l.lit && Math.hypot(l.pos[0] - sim.pos[0], l.pos[2] - sim.pos[2]) <= T.interact_radius,
       );
-      if (near && sim.state === "playing") {
+      if (near && sim.outcome === null) {
         const msg =
           sim.carried > 0
-            ? `Nhấn <kbd>E</kbd> để nạp đèn ${near.id} (${near.deposited}/${T.lantern_cost})`
-            : `Đèn ${near.id} cần đom đóm — hãy đi nhặt thêm`;
+            ? `<kbd>E</kbd> — Nạp ánh sáng (${near.deposited}/${T.lantern_cost})`
+            : `Đèn ${near.id} (${near.deposited}/${T.lantern_cost}) cần đom đóm — hãy đi nhặt thêm`;
         if (cache.get("prompt") !== msg) {
           cache.set("prompt", msg);
           promptEl.innerHTML = msg;

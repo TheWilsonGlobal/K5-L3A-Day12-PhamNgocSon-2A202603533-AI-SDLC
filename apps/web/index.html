@@ -5,63 +5,38 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Đảo Đèn Lồng</title>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="theme-color" content="#120a26" />
+    <meta name="theme-color" content="#0E1430" />
     <style>
+      :root {
+        --sky: #0e1430;
+        --mist: #1b2350;
+        --gold: #f2c14e;
+        --text: #f5f1e6;
+        --danger: #ff5a5f;
+        --lamp: #ffb347;
+      }
       html,
       body {
         margin: 0;
         height: 100%;
         overflow: hidden;
-        background: #0b0718;
-        font-family: system-ui, sans-serif;
-        color: #ffe9c2;
+        background: var(--sky);
+        font-family: system-ui, "Segoe UI", sans-serif;
+        color: var(--text);
       }
       canvas {
         display: block;
       }
-      #hud {
-        position: fixed;
-        top: 14px;
-        left: 14px;
-        pointer-events: none;
-        user-select: none;
-      }
-      .hud-card {
-        min-width: 252px;
-        padding: 12px 14px 10px;
-        border-radius: 16px;
-        background: linear-gradient(160deg, rgba(40, 24, 78, 0.82), rgba(16, 9, 36, 0.86));
-        border: 1px solid rgba(255, 176, 74, 0.45);
-        box-shadow:
-          0 6px 24px rgba(0, 0, 0, 0.45),
-          inset 0 0 18px rgba(255, 176, 74, 0.08);
-        backdrop-filter: blur(6px);
-        font-size: 14px;
-      }
-      .hud-card .lab {
-        flex: 0 0 76px;
-        font-size: 10.5px;
-        letter-spacing: 0.09em;
-        text-transform: uppercase;
-        color: #b9a7e8;
-      }
-      .hud-row {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        min-height: 28px;
-      }
-      .hud-row .icons,
-      .hud-row .pips {
-        display: flex;
-        gap: 5px;
-        flex: 1;
-      }
-      .hud-row .val {
-        min-width: 30px;
-        text-align: right;
-        font-variant-numeric: tabular-nums;
-        color: #ffe9c2;
+      kbd {
+        display: inline-block;
+        padding: 0 6px;
+        margin: 0 1px;
+        border: 1px solid rgba(242, 193, 78, 0.6);
+        border-radius: 4px;
+        background: #1b2350;
+        font-family: inherit;
+        font-size: 0.88em;
+        color: var(--text);
       }
       .ic {
         display: inline-flex;
@@ -73,153 +48,215 @@
         height: 100%;
         fill: currentColor;
       }
-      .ic.flame {
-        color: #ff8a2a;
-        filter: drop-shadow(0 0 5px rgba(255, 138, 42, 0.8));
-        transition:
-          opacity 0.25s,
-          filter 0.25s,
-          color 0.25s;
+      .lab {
+        font-size: 10.5px;
+        letter-spacing: 0.09em;
+        text-transform: uppercase;
+        color: #aeb6dc;
       }
-      .ic.flame.off {
-        color: #4a3d6e;
-        filter: none;
-        opacity: 0.55;
+
+      /* ---------- HUD ---------- */
+      #hud {
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        user-select: none;
       }
-      .pip {
-        width: 14px;
-        height: 14px;
-        border-radius: 50%;
-        background: #2a2145;
-        border: 1px solid #5a4a8a;
-        transition:
-          background 0.2s,
-          box-shadow 0.2s;
-      }
-      .pip.on {
-        background: radial-gradient(circle at 35% 30%, #fffbd0, #ffd84a 60%, #e0a020);
-        border-color: #ffe27a;
-        box-shadow: 0 0 8px rgba(255, 224, 90, 0.9);
-      }
-      .ic.lantern {
-        width: 24px;
-        height: 24px;
-        transition: filter 0.3s;
-      }
-      .ic.lantern.part {
-        filter: drop-shadow(0 0 3px rgba(255, 176, 74, 0.5));
-      }
-      .ic.lantern.lit {
-        filter: drop-shadow(0 0 7px rgba(255, 195, 90, 0.95));
-      }
-      .hud-time {
+      .z {
+        position: absolute;
         display: flex;
         align-items: center;
-        gap: 8px;
-        margin-top: 6px;
-        color: #ffe9c2;
+        gap: 10px;
+        padding: 8px 14px;
+        border-radius: 14px;
+        background: linear-gradient(160deg, rgba(27, 35, 80, 0.82), rgba(14, 20, 48, 0.86));
+        border: 1px solid rgba(242, 193, 78, 0.42);
+        box-shadow: 0 6px 22px rgba(0, 0, 0, 0.4);
+        backdrop-filter: blur(6px);
       }
-      .hud-time b {
-        min-width: 42px;
-        font-size: 18px;
+      .z.tl {
+        top: 14px;
+        left: 14px;
+      }
+      .z.tc {
+        top: 14px;
+        left: 50%;
+        transform: translateX(-50%);
+        color: var(--text);
+      }
+      .z.tc b {
+        font-size: 22px;
         font-variant-numeric: tabular-nums;
+        letter-spacing: 0.04em;
       }
-      .bar {
-        flex: 1;
-        height: 8px;
-        border-radius: 8px;
-        background: rgba(255, 255, 255, 0.1);
-        overflow: hidden;
+      .z.tc.low {
+        color: var(--danger);
+        border-color: var(--danger);
+        animation: blink 0.8s ease-in-out infinite;
       }
-      .bar > i {
-        display: block;
-        height: 100%;
-        border-radius: 8px;
-        background: linear-gradient(90deg, #ffb04a, #ffe27a);
-      }
-      .hud-time.low {
-        color: #ff8a8a;
-        animation: lowpulse 0.9s ease-in-out infinite;
-      }
-      .hud-time.low .bar > i {
-        background: linear-gradient(90deg, #ff5a5a, #ff9a6a);
-      }
-      @keyframes lowpulse {
+      @keyframes blink {
         50% {
-          opacity: 0.55;
+          opacity: 0.45;
         }
       }
-      .hud-bottom {
-        display: flex;
+      .z.tr {
+        top: 14px;
+        right: 14px;
         flex-direction: column;
-        gap: 6px;
-        margin-top: 8px;
-        padding-top: 8px;
-        border-top: 1px solid rgba(255, 255, 255, 0.1);
+        align-items: flex-end;
+        gap: 4px;
       }
+      .lamps,
       .score {
         display: flex;
         align-items: center;
         gap: 8px;
-        color: #ffd84a;
+      }
+      .lamps b {
+        font-size: 17px;
+        font-variant-numeric: tabular-nums;
+      }
+      .score {
+        color: var(--gold);
       }
       .score b {
-        font-size: 20px;
-        font-variant-numeric: tabular-nums;
-        color: #fff3c8;
         display: inline-block;
+        font-size: 22px;
+        font-variant-numeric: tabular-nums;
+        color: var(--gold);
       }
       .score b.bump {
         animation: bump 0.35s ease-out;
       }
       @keyframes bump {
         40% {
-          transform: scale(1.35);
-          color: #ffd84a;
+          transform: scale(1.3);
         }
       }
-      .pulse {
+      .flames {
         display: flex;
+        gap: 4px;
+      }
+      .ic.flame {
+        width: 24px;
+        height: 24px;
+        color: #ff8a2a;
+        filter: drop-shadow(0 0 5px rgba(255, 138, 42, 0.8));
+        transition:
+          opacity 0.25s,
+          color 0.25s,
+          filter 0.25s;
+      }
+      .ic.flame.off {
+        color: #4a4f72;
+        filter: none;
+        opacity: 0.55;
+      }
+      .z.bc {
+        bottom: 18px;
+        left: 50%;
+        transform: translateX(-50%);
+        flex-direction: column;
+        gap: 6px;
+      }
+      .fbar {
+        display: flex;
+        gap: 4px;
+      }
+      .cell {
+        width: 22px;
+        height: 12px;
+        border-radius: 4px;
+        background: #1b2350;
+        border: 1px solid #4a5290;
+        transition:
+          background 0.15s,
+          box-shadow 0.15s;
+      }
+      .cell.on {
+        background: linear-gradient(180deg, #fff6c2, #ffe58a);
+        border-color: #ffe58a;
+        box-shadow: 0 0 8px rgba(255, 229, 138, 0.85);
+      }
+      .fcount b {
+        font-variant-numeric: tabular-nums;
+      }
+      .z.br {
+        bottom: 18px;
+        right: 14px;
+        gap: 14px;
+        padding: 8px 12px;
+      }
+      .cd {
+        display: flex;
+        flex-direction: column;
         align-items: center;
-        gap: 8px;
-        color: #8fd0ff;
-      }
-      .pulse .lab {
-        flex: 0 0 auto;
-        color: #9ec9ee;
-      }
-      .pulse .bar > i {
-        background: linear-gradient(90deg, #4a8aff, #9ad0ff);
-      }
-      .pulse .state {
+        gap: 2px;
         min-width: 70px;
-        text-align: right;
-        font-size: 12px;
-      }
-      .pulse.wait {
-        color: #7a86a8;
-      }
-      .pulse.wait .bar > i {
-        background: #4a5a88;
-      }
-      .pulse.ready .ic {
-        filter: drop-shadow(0 0 5px rgba(120, 190, 255, 0.9));
-      }
-      .hud-keys {
-        margin-top: 8px;
         font-size: 11px;
-        color: #9a8cc4;
+        --col: #aeb6dc;
+        color: #aeb6dc;
+      }
+      .cd .ring {
+        --p: 1;
+        width: 52px;
+        height: 52px;
+        border-radius: 50%;
+        display: grid;
+        place-items: center;
+        background: conic-gradient(var(--col) calc(var(--p) * 360deg), rgba(255, 255, 255, 0.12) 0);
+      }
+      .cd .ring .ic {
+        width: 42px;
+        height: 42px;
+        padding: 10px;
+        box-sizing: border-box;
+        border-radius: 50%;
+        background: #131a3c;
+      }
+      .cd .st {
+        font-variant-numeric: tabular-nums;
+      }
+      .cd.ready {
+        --col: #ffb347;
+        color: var(--text);
+      }
+      #dashBoxHolder,
+      [data-r="dashBox"].ready,
+      [data-r="pulseBox"].ready {
+        --col: #ffb347;
+      }
+      [data-r="pulseBox"].ready {
+        --col: #9ad0ff;
+      }
+      [data-r="charmBox"] {
+        --col: #ff5a5f;
+        color: #ffb0b3;
+      }
+      [data-r="charmBox"].gone {
+        opacity: 0.4;
+        color: #aeb6dc;
+      }
+      .keys {
+        position: absolute;
+        left: 14px;
+        bottom: 18px;
+        font-size: 11.5px;
+        color: #aeb6dc;
+        background: rgba(14, 20, 48, 0.6);
+        padding: 4px 10px;
+        border-radius: 10px;
       }
       #prompt {
         position: fixed;
         left: 50%;
-        bottom: 84px;
+        bottom: 96px;
         transform: translate(-50%, 8px);
         padding: 9px 20px;
         border-radius: 999px;
-        background: rgba(30, 18, 60, 0.88);
-        border: 1px solid rgba(255, 176, 74, 0.7);
-        box-shadow: 0 0 18px rgba(255, 176, 74, 0.35);
+        background: rgba(27, 35, 80, 0.9);
+        border: 1px solid rgba(255, 179, 71, 0.75);
+        box-shadow: 0 0 18px rgba(255, 179, 71, 0.35);
         font-size: 15px;
         opacity: 0;
         pointer-events: none;
@@ -232,61 +269,41 @@
         transform: translate(-50%, 0);
       }
       #prompt.warn {
-        border-color: #9a86d8;
+        border-color: #8a8fa6;
         box-shadow: none;
-        color: #cfc4f2;
+        color: #cfd3ea;
       }
-      kbd {
-        display: inline-block;
-        padding: 0 6px;
-        margin: 0 1px;
-        border: 1px solid rgba(255, 176, 74, 0.6);
-        border-radius: 4px;
-        background: #2a1d4a;
-        font-family: inherit;
-        font-size: 0.9em;
-        color: #ffe9c2;
-      }
-      #help {
+      #arrow {
         position: fixed;
-        bottom: 12px;
-        left: 12px;
-        font-size: 13px;
-        opacity: 0.8;
-        pointer-events: none;
-      }
-      #end {
-        position: fixed;
-        inset: 0;
+        left: 0;
+        top: 0;
         display: none;
-        place-items: center;
-        background: rgba(8, 4, 20, 0.7);
-        text-align: center;
+        flex-direction: column;
+        align-items: center;
+        gap: 2px;
+        pointer-events: none;
+        filter: drop-shadow(0 0 6px rgba(255, 179, 71, 0.8));
       }
-      #end.show {
-        display: grid;
+      #arrow .tip {
+        width: 0;
+        height: 0;
+        border-left: 13px solid transparent;
+        border-right: 13px solid transparent;
+        border-bottom: 26px solid var(--lamp);
       }
-      #end h1 {
-        font-size: 44px;
-        margin: 0 0 8px;
-      }
-      #end button {
-        margin-top: 18px;
-        padding: 10px 26px;
-        font-size: 18px;
-        border: 0;
+      #arrow .dist {
+        font-size: 11px;
+        padding: 1px 7px;
         border-radius: 8px;
-        background: #ffb04a;
-        color: #2a1600;
-        cursor: pointer;
+        background: rgba(14, 20, 48, 0.85);
+        color: var(--text);
       }
-
       #minimap {
         position: fixed;
-        right: 12px;
-        bottom: 12px;
-        width: 200px;
-        height: 200px;
+        top: 96px;
+        right: 14px;
+        width: 180px;
+        height: 180px;
         border-radius: 50%;
         pointer-events: none;
       }
@@ -304,80 +321,167 @@
         font-size: 12px;
         white-space: nowrap;
         border-radius: 6px;
-        background: rgba(20, 12, 40, 0.85);
-        border: 1px solid #9a86d8;
-        color: #efe8ff;
+        background: rgba(14, 20, 48, 0.88);
+        border: 1px solid #8a8fa6;
+        color: var(--text);
       }
       .lbl.may {
         border-color: #fff;
       }
-      .lbl.lantern {
-        border-color: #9a86d8;
-      }
       .lbl.lit {
-        border-color: #ffc35a;
-        color: #ffe2a0;
+        border-color: var(--lamp);
+        color: #ffe9b0;
       }
       .lbl.shade {
-        border-color: #a23cff;
-        color: #e0c4ff;
+        border-color: #7a3cff;
+        color: #d9c8ff;
+      }
+      .lbl.drifter {
+        border-color: #8fa3b8;
+        color: #cfdbe8;
+      }
+      .lbl.charm {
+        border-color: var(--gold);
+        color: #ffd0d3;
       }
       .lbl.mote {
-        border-color: #fff08a66;
-        color: #fff08a;
+        border-color: rgba(255, 229, 138, 0.4);
+        color: #ffe58a;
         font-size: 10px;
         padding: 0 4px;
       }
-      #guide {
+
+      /* ---------- screens ---------- */
+      .screen {
         position: fixed;
         inset: 0;
         display: none;
         place-items: center;
-        background: rgba(8, 4, 20, 0.82);
+        background: rgba(8, 10, 28, 0.84);
+        z-index: 20;
+        text-align: center;
       }
-      #guide.show {
+      .screen.show {
         display: grid;
       }
-      #guide .card {
+      .card {
         width: min(560px, calc(100vw - 32px));
         max-height: calc(100vh - 32px);
         overflow: auto;
-        padding: 20px 24px;
-        background: #1a1030;
-        border: 1px solid #ffb04a88;
-        border-radius: 14px;
+        box-sizing: border-box;
+        padding: 24px 28px;
+        background: linear-gradient(170deg, #1b2350, #0e1430);
+        border: 1px solid rgba(242, 193, 78, 0.5);
+        border-radius: 18px;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
         line-height: 1.55;
+      }
+      .card h1 {
+        margin: 0;
+        font-size: 40px;
+        color: var(--gold);
+        letter-spacing: 0.02em;
+      }
+      .card h2 {
+        margin: 2px 0 8px;
+        font-size: 28px;
+        color: var(--gold);
+      }
+      .card .sub,
+      .kicker {
+        color: #aeb6dc;
+        margin: 4px 0 14px;
+      }
+      .kicker {
+        text-transform: uppercase;
+        letter-spacing: 0.14em;
+        font-size: 12px;
+      }
+      blockquote {
+        margin: 12px 0 2px;
+        padding: 10px 14px;
+        font-style: italic;
+        border-left: 3px solid var(--lamp);
+        background: rgba(255, 255, 255, 0.04);
+        text-align: left;
+      }
+      cite {
+        display: block;
+        text-align: right;
+        color: var(--gold);
+        margin-bottom: 14px;
+      }
+      .btns {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        margin-top: 14px;
+      }
+      .btns.row {
+        flex-direction: row;
+        flex-wrap: wrap;
+        justify-content: center;
+      }
+      button {
+        font: inherit;
+        padding: 10px 22px;
+        font-size: 16px;
+        color: #2a1600;
+        background: linear-gradient(180deg, #ffd27a, #ffb347);
+        border: 0;
+        border-radius: 10px;
+        cursor: pointer;
+      }
+      button:hover {
+        filter: brightness(1.08);
+      }
+      button.ghost {
+        color: var(--text);
+        background: rgba(255, 255, 255, 0.08);
+        border: 1px solid rgba(242, 193, 78, 0.4);
+      }
+      .stats {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 4px 20px;
+        margin: 10px 0;
+        text-align: left;
+      }
+      .stats b {
+        text-align: right;
+        font-variant-numeric: tabular-nums;
+        color: var(--gold);
+      }
+      .big {
+        font-size: 44px;
+        color: var(--gold);
+        font-weight: 700;
+        font-variant-numeric: tabular-nums;
+      }
+      .field {
+        display: grid;
+        grid-template-columns: 130px 1fr 48px;
+        align-items: center;
+        gap: 10px;
+        margin: 14px 0;
+        text-align: left;
+      }
+      input[type="range"] {
+        width: 100%;
+        accent-color: var(--lamp);
+      }
+      .guide {
+        text-align: left;
         font-size: 14.5px;
       }
-      #guide h2 {
-        margin: 0 0 4px;
-        font-size: 24px;
-      }
-      #guide h3 {
+      .guide h3 {
         margin: 14px 0 4px;
         font-size: 15px;
-        color: #ffb04a;
+        color: #ffb347;
       }
-      #guide ul {
+      .guide ul {
         margin: 0;
         padding-left: 20px;
-      }
-      #guide kbd {
-        padding: 0 6px;
-        border: 1px solid #ffb04a88;
-        border-radius: 4px;
-        background: #2a1d4a;
-        font-size: 13px;
-      }
-      #guide button {
-        margin-top: 14px;
-        padding: 9px 22px;
-        font-size: 16px;
-        border: 0;
-        border-radius: 8px;
-        background: #ffb04a;
-        color: #2a1600;
-        cursor: pointer;
       }
       .dot {
         display: inline-block;
@@ -389,42 +493,166 @@
     </style>
   </head>
   <body>
+    <div id="labels"></div>
     <div id="hud"></div>
     <div id="prompt"></div>
-    <div id="labels"></div>
+    <div id="arrow">
+      <div class="tip"></div>
+      <div class="dist"></div>
+    </div>
     <canvas id="minimap"></canvas>
-    <div id="guide">
+
+    <!-- main menu -->
+    <div id="menu" class="screen show">
       <div class="card">
-        <h2>⏸ Tạm dừng · Hướng dẫn</h2>
-        <div>Mây phải thắp sáng <b>5 Đèn Lồng</b> trước khi trời sáng (300 s) và còn Ngọn Lửa.</div>
-        <h3>Cách thắp một đèn</h3>
+        <h1>Đảo Đèn Lồng</h1>
+        <div class="sub">Mây thắp lại ba hòn đảo trong biển mây</div>
+        <div class="btns">
+          <button id="btnPlay">Bắt đầu hành trình</button>
+          <div class="btns row">
+            <button class="ghost" data-night="1">Đêm 1 · Đảo Bến</button>
+            <button class="ghost" data-night="2">Đêm 2 · Đảo Cau</button>
+            <button class="ghost" data-night="3">Đêm 3 · Đảo Chuông</button>
+          </div>
+          <div class="btns row">
+            <button class="ghost" id="btnGuideMenu">Hướng dẫn</button>
+            <button class="ghost" id="btnSettingsMenu">Cài đặt</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- night introduction -->
+    <div id="intro" class="screen">
+      <div class="card">
+        <div class="kicker" id="introKicker"></div>
+        <h2 id="introName"></h2>
+        <blockquote id="introQuote"></blockquote>
+        <cite>— Ông Đăng</cite>
+        <div class="sub" id="introFacts"></div>
+        <button id="btnStart">Bắt đầu (Enter)</button>
+      </div>
+    </div>
+
+    <!-- night result -->
+    <div id="result" class="screen">
+      <div class="card">
+        <div class="kicker" id="resKicker"></div>
+        <h2 id="resTitle"></h2>
+        <div class="stats" id="resStats"></div>
+        <div class="btns row">
+          <button id="btnNext">Đêm kế tiếp (Enter)</button>
+          <button id="btnRetry">Chơi lại Đêm (Enter)</button>
+          <button class="ghost" id="btnResMenu">Về menu</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- dawn -->
+    <div id="dawn" class="screen">
+      <div class="card">
+        <div class="kicker">Ba đêm đã qua</div>
+        <h1>Bình Minh</h1>
+        <div class="sub">Ba hòn đảo sáng đèn. Biển mây ửng vàng — Mây đã làm được.</div>
+        <div class="big" id="dawnScore">0</div>
+        <div class="kicker">tổng điểm</div>
+        <div class="stats" id="dawnStats"></div>
+        <div class="btns row">
+          <button id="btnDawnAgain">Chơi lại từ Đêm 1</button>
+          <button class="ghost" id="btnDawnMenu">Về menu</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- pause -->
+    <div id="pause" class="screen">
+      <div class="card">
+        <h2>Tạm dừng</h2>
+        <div class="sub">Logic game đã dừng hẳn.</div>
+        <div class="btns">
+          <button id="btnResume">Tiếp tục</button>
+          <button class="ghost" id="btnRestart">Chơi lại Đêm</button>
+          <button class="ghost" id="btnSettingsPause">Cài đặt</button>
+          <button class="ghost" id="btnGuidePause">Hướng dẫn</button>
+          <button class="ghost" id="btnPauseMenu">Về menu</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- settings -->
+    <div id="settings" class="screen">
+      <div class="card">
+        <h2>Cài đặt</h2>
+        <div class="field">
+          <label for="optVolume">Âm lượng</label>
+          <input id="optVolume" type="range" min="0" max="100" step="1" />
+          <span id="optVolumeV"></span>
+        </div>
+        <div class="field">
+          <label for="optSens">Độ nhạy chuột</label>
+          <input id="optSens" type="range" min="20" max="300" step="5" />
+          <span id="optSensV"></span>
+        </div>
+        <div class="sub">Tự động lưu cho các lần mở sau.</div>
+        <button id="btnSettingsBack">Quay lại</button>
+      </div>
+    </div>
+
+    <!-- guide -->
+    <div id="guide" class="screen">
+      <div class="card guide">
+        <h2 style="text-align: center">Hướng dẫn</h2>
+        <div>
+          Thắp sáng <b>mọi đèn lồng</b> của đêm trước khi trời sáng và khi còn Ngọn Lửa. Qua ba đêm
+          (Đảo Bến, Đảo Cau, Đảo Chuông) sẽ tới Bình Minh.
+        </div>
+        <h3>Thắp đèn</h3>
         <ul>
-          <li>Đi qua đom đóm vàng để nhặt (tối đa 5).</li>
+          <li>Đi qua đom đóm vàng để nhặt (tối đa <b>10</b>).</li>
           <li>
-            Lại gần một đèn chưa sáng (trong 3 m) rồi nhấn <kbd>E</kbd>:
-            <b>nạp hết số đom đóm đang mang</b> vào đèn đó, tối đa đủ 4. Mỗi đèn cần <b>đủ 4</b> mới
-            sáng.
+            Lại gần đèn chưa sáng (trong <b>2 m</b>) rồi nhấn <kbd>E</kbd>: nạp tối đa số đom đóm
+            đèn còn thiếu. Mỗi đèn cần <b>đủ 10</b>; nạp dở dang vẫn được nhớ. Mỗi đom đóm nạp +10
+            điểm, mỗi đèn sáng +100.
           </li>
           <li>
-            <b>Nạp dở dang vẫn được giữ.</b> Mang 2 rồi nhấn E thì đèn ở mức 2/4 (chưa sáng); nhặt
-            thêm 2 và quay lại nhấn E để hoàn tất. Bị Bóng Mực chạm làm rơi bớt đom đóm nên hay gặp
-            trường hợp này.
+            Quanh đèn đã sáng có vòng <b>6 m</b> mà Bóng Mực không vào được — chỗ nghỉ an toàn.
           </li>
-          <li>
-            Xem tiến độ từng đèn: <b>4 chấm</b> quanh bóng đèn (chấm cam = đã nạp), con số
-            <b>2/4</b> phía trên đèn, vòng cam trên bản đồ nhỏ. Bóng đèn càng nạp càng ấm và to; đèn
-            sáng hẳn có <b>✔ sáng</b> và vòng an toàn dưới chân.
-          </li>
-          <li>
-            Bóng Mực không vào được vòng 6 m quanh đèn <b>đã sáng</b> — đứng trong vòng đó là chỗ
-            nghỉ an toàn.
-          </li>
+          <li>Thắng đêm: + giây còn lại × 2 + 50 điểm mỗi Ngọn Lửa còn lại.</li>
         </ul>
         <h3>Nguy hiểm</h3>
         <ul>
-          <li>Bóng Mực chạm bạn: mất 1 Ngọn Lửa và rơi một nửa số đom đóm đang mang.</li>
           <li>
-            <kbd>F</kbd> xung sáng (tốn 1 đom đóm, hồi 5 s): choáng và đẩy lùi Bóng Mực trong 8 m.
+            <b>Bóng Mực</b> chạm bạn: mất 1 Ngọn Lửa, rơi một nửa đom đóm đang mang, bất tử 1,5 s.
+            Hết Ngọn Lửa là thua.
+          </li>
+          <li>
+            <b>Rơi khỏi đảo</b> (xuống biển mây): mất 1 Ngọn Lửa và toàn bộ đom đóm, chờ 1 s rồi hồi
+            sinh ở điểm xuất phát.
+          </li>
+          <li>
+            <b>Gió Lạc</b> (Đêm 2, 3): dải lụa xám xanh cướp 3 đom đóm khi bạn mang từ 5 trở lên.
+            Tỏa Sáng trúng nó lúc đang trốn sẽ làm nó thả hết đồ cướp.
+          </li>
+          <li>
+            <b>Gió mạnh</b> (Đêm 3): mỗi 30 s, báo trước 2 s bằng lá bay, đẩy bạn 2 m/s trong 5 s.
+          </li>
+        </ul>
+        <h3>Kỹ năng</h3>
+        <ul>
+          <li>
+            <kbd>F</kbd> <b>Tỏa Sáng</b>: tốn 3 đom đóm, choáng và đẩy lùi Bóng Mực trong 5 m, hồi 3
+            s.
+          </li>
+          <li>
+            <kbd>Shift</kbd> <b>Lướt</b>: 14 m/s trong 0,2 s, hồi 1,5 s; không bất tử khi lướt.
+          </li>
+          <li>
+            <b>Bục nhảy</b> (vòng vàng) bắn bạn sang đảo/tầng khác; phím di chuyển không đổi được
+            hướng bay.
+          </li>
+          <li>
+            <b>Bùa Gió</b> (lá bùa đỏ viền vàng): 10 s chạy 7,2 m/s và lướt liên tục; hồi lại sau 45
+            s.
           </li>
         </ul>
         <h3>Điều khiển</h3>
@@ -436,36 +664,30 @@
             hoặc kéo chuột: xoay camera
           </li>
           <li>
-            <kbd>H</kbd>: bật/tắt nhãn tên cho mọi vật trên màn hình ·
-            <kbd>P</kbd>/<kbd>G</kbd>/<kbd>Esc</kbd>: mở/đóng hướng dẫn này
+            <kbd>H</kbd>: bật/tắt nhãn tên mọi vật trên màn hình · <kbd>Esc</kbd>/<kbd>P</kbd>: tạm
+            dừng
           </li>
         </ul>
-        <h3>Bản đồ nhỏ (góc phải dưới)</h3>
+        <h3>Giao diện</h3>
         <ul>
-          <li>Phía trên bản đồ là hướng camera đang nhìn.</li>
+          <li>
+            Bản đồ nhỏ (góc phải): trên là hướng camera. Mũi tên vàng chỉ tới đèn chưa sáng gần nhất
+            khi nó ở ngoài màn hình.
+          </li>
           <li>
             <span class="dot" style="background: #fff"></span>Mây ·
-            <span class="dot" style="background: #ffc35a"></span>đèn sáng ·
-            <span class="dot" style="background: #2a2145; border: 1px solid #9a86d8"></span>đèn chưa
-            sáng (vòng cam = tiến độ nạp) · <span class="dot" style="background: #fff08a"></span>đom
-            đóm · <span class="dot" style="background: #a23cff"></span>Bóng Mực (xanh = bị choáng)
+            <span class="dot" style="background: #ffb347"></span>đèn sáng ·
+            <span class="dot" style="background: #2a2a3a; border: 1px solid #8a8fa6"></span>đèn chưa
+            sáng · <span class="dot" style="background: #fff6c2"></span>đom đóm ·
+            <span class="dot" style="background: #7a3cff"></span>Bóng Mực
           </li>
         </ul>
-        <button id="resume">Tiếp tục (P)</button>
+        <div style="text-align: center; margin-top: 14px">
+          <button id="btnGuideBack">Đóng</button>
+        </div>
       </div>
     </div>
 
-    <div id="help">
-      WASD / mũi tên: di chuyển · Space: nhảy · E: nạp đèn · F: xung sáng · Q/R hoặc kéo chuột: xoay
-      camera · H: nhãn · P: tạm dừng/hướng dẫn
-    </div>
-    <div id="end">
-      <div>
-        <h1 id="endTitle"></h1>
-        <div id="endText"></div>
-        <button id="again">Chơi lại (Enter)</button>
-      </div>
-    </div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

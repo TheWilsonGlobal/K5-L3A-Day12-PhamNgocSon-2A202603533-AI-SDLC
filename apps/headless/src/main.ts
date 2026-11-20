@@ -3,7 +3,7 @@ import { InputError, parseInputs, parseScenario, runHeadless, type Contract } fr
 import contract from "../../../game.contract.json" with { type: "json" };
 
 const USAGE =
-  "usage: headless --seed <int> --night 1 [--scenario <file.json>] [--inputs <file.json>] " +
+  "usage: headless --seed <int> --night 1|2|3 [--scenario <file.json>] [--inputs <file.json>] " +
   "--ticks <int> --out <file.jsonl> [--snapshot-every <int>]";
 
 function fail(code: number, msg: string): never {
@@ -53,7 +53,7 @@ function readJson(path: string, what: string): unknown {
 const args = parseArgs(process.argv.slice(2));
 const seed = int(args, "seed", { min: -2147483648 });
 const night = int(args, "night", { min: 1 });
-if (night !== 1) fail(1, "only --night 1 exists in phase 1");
+if (night < 1 || night > 3) fail(1, "--night must be 1, 2 or 3");
 const ticks = int(args, "ticks", { min: 0 });
 const every = int(args, "snapshot-every", { min: 1, def: 10 });
 const out = args.get("out");
@@ -68,6 +68,7 @@ try {
     tuning: (contract as Contract).tuning,
     seed,
     ticks,
+    night,
     snapshotEvery: every,
     scenario,
     inputs,

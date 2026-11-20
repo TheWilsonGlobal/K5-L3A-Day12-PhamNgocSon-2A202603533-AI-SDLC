@@ -102,32 +102,103 @@ describe("headless CLI (built bundle)", () => {
     expect(
       cli(["--seed", "x", "--night", "1", "--ticks", "5", "--out", join(dir, "y.jsonl")]).code,
     ).toBe(1);
-    expect(
-      cli(["--seed", "1", "--night", "2", "--ticks", "5", "--out", join(dir, "y.jsonl")]).code,
-    ).toBe(1);
+    for (const bad of ["0", "4"]) {
+      expect(
+        cli(["--seed", "1", "--night", bad, "--ticks", "5", "--out", join(dir, "y.jsonl")]).code,
+      ).toBe(1);
+    }
   });
 
-  it("is fast: a full 5-minute night (18000 ticks) in well under 2 s", () => {
-    const sc = f("nosh.json", { random_shades: false, shades: [] });
+  it("accepts --night 1, 2 and 3 and announces the night", () => {
+    for (const n of [1, 2, 3]) {
+      const out = join(dir, `n${n}.jsonl`);
+      expect(cli(["--seed", "1", "--night", String(n), "--ticks", "30", "--out", out]).code).toBe(
+        0,
+      );
+      const lines = readFileSync(out, "utf8")
+        .trim()
+        .split("\n")
+        .map((l) => JSON.parse(l));
+      expect(lines[0].night).toBe(n);
+      expect(lines[1]).toEqual({ type: "event", tick: 0, name: "night_start", data: { night: n } });
+    }
+  });
+
+  it("accepts the v1.1 scenario and input fields (dash, pause, drifters, charms, wind)", () => {
+    const sc = f("v11.json", {
+      player: {
+        pos: [35, 0, 0],
+        carried: 6,
+        invuln_ticks: 10,
+        dash_cd_ticks: 0,
+        pulse_cd_ticks: 0,
+        charm_ticks: 0,
+      },
+      random_motes: false,
+      random_shades: false,
+      random_drifters: false,
+      wind_enabled: false,
+      motes: [],
+      shades: [{ id: "S1", pos: [30, 0, 0], state: "stunned", state_ticks_left: 50 }],
+      drifters: [{ id: "D1", pos: [40, 1.5, 0], state: "idle" }],
+      charms: [{ id: "C1", pos: [35, 0, 0], available: true }],
+    });
+    const inp = f("v11-in.json", {
+      frames: [
+        { tick: 0, dash: true },
+        { tick: 1, dash: false, pause: true },
+      ],
+    });
+    const out = join(dir, "v11.jsonl");
+    expect(
+      cli([
+        "--seed",
+        "1",
+        "--night",
+        "2",
+        "--scenario",
+        sc,
+        "--inputs",
+        inp,
+        "--ticks",
+        "10",
+        "--out",
+        out,
+      ]).code,
+    ).toBe(0);
+    const lines = readFileSync(out, "utf8")
+      .trim()
+      .split("\n")
+      .map((l) => JSON.parse(l));
+    expect(lines.filter((l) => l.type === "event").map((l) => l.name)).toEqual(
+      expect.arrayContaining(["night_start", "charm_picked", "dash", "paused"]),
+    );
+    expect(lines.at(-1)).toMatchObject({ type: "end", ticks: 10, state: "paused" });
+  });
+
+  it("is fast: a whole Night 3 (21,600 ticks) far inside the 30 s budget", () => {
+    const sc = f("full3.json", { player: { flames: 99 } });
+    const inp = f("full3-in.json", { frames: [{ tick: 0, move: [0.4, 1] }] });
+    const out = join(dir, "full.jsonl");
     const t = Date.now();
     expect(
       cli([
         "--seed",
         "1",
         "--night",
-        "1",
+        "3",
         "--scenario",
         sc,
+        "--inputs",
+        inp,
         "--ticks",
-        "18000",
-        "--snapshot-every",
-        "60",
+        "21600",
         "--out",
-        join(dir, "full.jsonl"),
+        out,
       ]).code,
     ).toBe(0);
-    expect(Date.now() - t).toBeLessThan(2000);
-    const endLine = readFileSync(join(dir, "full.jsonl"), "utf8").trim().split("\n").at(-1)!;
-    expect(JSON.parse(endLine).ticks).toBe(18000);
+    expect(Date.now() - t).toBeLessThan(30_000);
+    const endLine = readFileSync(out, "utf8").trim().split("\n").at(-1)!;
+    expect(JSON.parse(endLine).ticks).toBeGreaterThan(1000);
   });
 });

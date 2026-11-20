@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { PAL } from "./palette.ts";
 
 // Visual-only rigs. They read positions from the sim and never feed anything back.
 
@@ -32,8 +33,8 @@ export function createMay(): MayRig {
   const body = new THREE.Group(); // bobs and leans as a unit
   group.add(body);
 
-  const cream = std(0xf4e6c8, 0x6a5a3a, 0.45);
-  const teal = std(0x2f9d94, 0x0f4a46, 0.6);
+  const cream = std(PAL.robe, 0x6a5a3a, 0.4);
+  const teal = std(PAL.robe, 0x6a5a3a, 0.4); // sleeves and tunic top share the standard robe colour
   const skin = std(0xf0c9a0);
   const hairMat = std(0x2a1a14);
   const straw = std(0xf0d48e, 0x7a5a1a, 0.7);
@@ -83,6 +84,16 @@ export function createMay(): MayRig {
   tie.position.y = -0.46;
   braid.add(braidMesh, tie);
   body.add(braid);
+
+  // red scarf (khăn) at the neck, with a short tail that flutters while running
+  const scarfMat = std(PAL.scarf, 0x4a0a14, 0.5);
+  const scarfRing = new THREE.Mesh(new THREE.TorusGeometry(0.2, 0.06, 8, 20), scarfMat);
+  scarfRing.rotation.x = Math.PI / 2;
+  scarfRing.position.y = 1.5;
+  const scarfTail = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.34, 0.03), scarfMat);
+  scarfTail.geometry.translate(0, -0.17, 0);
+  scarfTail.position.set(0.12, 1.5, -0.18);
+  body.add(scarfRing, scarfTail);
 
   // arms (teal sleeves) and legs (white trousers), each on a hip/shoulder pivot
   const makeLimb = (
@@ -200,6 +211,8 @@ export function createMay(): MayRig {
       braid.rotation.x =
         -0.15 * amp + Math.sin(phase * 0.5) * 0.12 * amp + Math.sin(t * 1.3) * 0.04;
       braid.rotation.z = Math.cos(phase) * 0.12 * amp;
+      scarfTail.rotation.x =
+        0.35 * amp + Math.sin(phase * 1.5) * 0.25 * amp + Math.sin(t * 2) * 0.05;
       // the lantern swings like a pendulum, more when walking
       lanternPivot.rotation.x = Math.sin(phase + 1) * 0.4 * amp + Math.sin(t * 1.6) * 0.07;
       lanternPivot.rotation.z = Math.cos(phase * 0.5) * 0.12 * amp + Math.sin(t * 1.1) * 0.04;
@@ -224,7 +237,9 @@ export interface ShadeRig {
   ): void;
 }
 
-const INK_VIOLET = new THREE.Color(0xa468ff);
+const INK_BODY = new THREE.Color(PAL.shadeBody);
+const INK_BODY_STUN = new THREE.Color(PAL.shadeStun);
+const INK_VIOLET = new THREE.Color(PAL.shadeRim);
 const STUN_BLUE = new THREE.Color(0x5aa8ff);
 const EYE_CHASE = new THREE.Color(0xf1eaff);
 const EYE_STUN = new THREE.Color(0x9ad0ff);
@@ -239,7 +254,7 @@ export function createShade(seed: number): ShadeRig {
   const inner = new THREE.Group(); // wobbles and faces the player
   group.add(inner);
 
-  const ink = std(0x0a0314, 0x24104a, 0.6, 0.4);
+  const ink = std(PAL.shadeBody, 0x24104a, 0.6, 0.4);
   const core = sphere(0.72, ink, 20, 14);
   core.scale.set(1, 1.15, 1);
   core.position.y = 1.05;
@@ -348,6 +363,7 @@ export function createShade(seed: number): ShadeRig {
       haloMat.color.copy(INK_VIOLET).lerp(STUN_BLUE, stun);
       haloMat.opacity = 0.55 - 0.22 * stun + Math.sin(tt * 3) * 0.05 * (1 - stun);
       groundMat.color.copy(haloMat.color);
+      ink.color.copy(INK_BODY).lerp(INK_BODY_STUN, stun);
       ink.emissive.copy(INK_EMIT).lerp(INK_EMIT_STUN, stun);
       wispMat.emissive.copy(WISP_EMIT).lerp(WISP_EMIT_STUN, stun);
       eyeMat.color.copy(EYE_CHASE).lerp(EYE_STUN, stun);
