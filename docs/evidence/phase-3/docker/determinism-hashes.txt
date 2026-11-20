@@ -1,0 +1,36 @@
+Phase 3 TR3 - native Windows vs Docker Linux determinism (seed 42)
+Date: 2026-11-20. Native Node v24.11.1 (win32). Docker image ddl-headless:tr3 id 517a1c9fa5bf, Node v22 (node:22-slim per Dockerfile), Docker Engine 29.9.2.
+Native cmd:  node apps/headless/dist/headless.js --seed 42 --night N [--inputs docs/evidence/phase-2/bench.inputs.json] --ticks T --out f.jsonl  (run twice)
+Docker cmd:  docker create --name c ddl-headless:tr3 --seed 42 --night N [--inputs /tmp/in.json] --ticks T --out /tmp/o.jsonl; [docker cp bench.inputs.json c:/tmp/in.json]; docker start -a c; docker cp c:/tmp/o.jsonl ...; docker rm c  (MSYS_NO_PATHCONV=1)
+SHORT = no inputs, --ticks 20000. RICH = bench.inputs.json, --ticks 14400/16200/18000 (dawn).
+
+night set native1 == native2 == docker  sha256
+N1 short IDENTICAL 87bd9d25b2b0573cd8f02591487d664a17f22ed247e3a9520b1ddcb044f99845
+N1 rich IDENTICAL a31f1c917c9fb435630d098bb0f5cbc08c18003a3e8d2aae8ff8580df51269e1
+N2 short IDENTICAL a0ae2b1cb0856da62bab79330badf6e50c7783dce6cc7acd324edac18ee8fe27
+N2 rich IDENTICAL 60a90138f8e451a887750cbe5a40db29f5e7047c05975744beb80291b5255463
+N3 short IDENTICAL a611b1121b0a634a62f9a19938ba6f4096d0fbafc8cf06522a442593867c8edb
+N3 rich IDENTICAL 548784cd827f9eb5165ce0ffe1023d9d49bf4816e3c09cb2aec8800538dfe189
+
+Event/line counts (native run 1; docker byte-identical):
+N1 short lines=706 {"snapshot":694,"night_start":1,"shade_spawned":6,"player_hit":3,"game_over":1,"end":1} lastTick=undefined
+N1 rich lines=164 {"snapshot":151,"night_start":1,"shade_spawned":4,"mote_picked":3,"player_hit":3,"game_over":1,"end":1} lastTick=undefined
+N2 short lines=370 {"snapshot":356,"night_start":1,"shade_spawned":8,"player_hit":3,"game_over":1,"end":1} lastTick=undefined
+N2 rich lines=124 {"snapshot":115,"night_start":1,"shade_spawned":3,"player_hit":3,"game_over":1,"end":1} lastTick=undefined
+N3 short lines=231 {"snapshot":218,"night_start":1,"shade_spawned":7,"player_hit":3,"game_over":1,"end":1} lastTick=undefined
+N3 rich lines=1017 {"snapshot":1000,"night_start":1,"shade_spawned":10,"dash":1,"player_hit":3,"game_over":1,"end":1} lastTick=undefined
+
+Rich-run game_over lines:
+N1 rich: {"type":"event","tick":1497,"name":"game_over","data":{"result":"lost","reason":"no_flames"}}
+N2 rich: {"type":"event","tick":1137,"name":"game_over","data":{"result":"lost","reason":"no_flames"}}
+N3 rich: {"type":"event","tick":9988,"name":"game_over","data":{"result":"lost","reason":"no_flames"}}
+
+Phase 3 fuel/lantern scenarios - native vs Docker (seed 42, --ticks 20000, 2026-11-20)
+Image ddl-headless:tr3 id 517a1c9fa5bf (sha256:517a1c9fa5bf2724b10e149df70a921a5c44ad3ad98b7b7dfd4d1fa2dd3e7482), rebuilt foreground from current tree (all layers cache hit = tree unchanged), Node v22 in image, Node v24.11.1 native, Docker Engine 29.9.2.
+Native cmd: pnpm --filter @ddl/headless build; node apps/headless/dist/headless.js --seed 42 --night N --scenario docs/evidence/phase-3/headless/fuel-nN.scenario.json --ticks 20000 --out f.jsonl
+Docker cmd: docker create --name c ddl-headless:tr3 --seed 42 --night N --scenario /tmp/s.json --ticks 20000 --out /tmp/o.jsonl; docker cp fuel-nN.scenario.json c:/tmp/s.json; docker start -a c; docker cp c:/tmp/o.jsonl ...; docker rm c  (MSYS_NO_PATHCONV=1)
+
+night native == docker == recorded  sha256
+N1 IDENTICAL 642a12d7deb226bb26b75398d7589665ceb7e82cff62053338604bbe6beacaea
+N2 IDENTICAL c0fc8bd1ce294cfa486e5c19afbc12f348c4fa9f9f69fccffbfd34b25cfa5591
+N3 IDENTICAL 6dbb1cfbf02e14c76705961076b489cb37ac0590ae034988a72096ae1bf51c0d

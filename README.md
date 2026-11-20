@@ -1,12 +1,12 @@
-# Đảo Đèn Lồng — 3 Đêm (Phase 2)
+# Đảo Đèn Lồng — 3 Đêm (Phase 3)
 
-Game 3D góc nhìn thứ ba: **Mây** gom đom đóm, thắp các Đèn Lồng trên ba hòn đảo, né **Bóng Mực** và **Gió Lạc**, xua chúng bằng Tỏa Sáng, lướt qua nguy hiểm. Có bản chơi (Three.js) và chế độ **headless** theo Test Contract **v1.1**.
+Game 3D góc nhìn thứ ba: **Mây** gom đom đóm, giữ các Đèn Lồng cháy sáng tới bình minh trên ba hòn đảo, né **Bóng Mực** (chúng hút dầu đèn) và **Gió Lạc**, xua chúng bằng Tỏa Sáng, lướt qua nguy hiểm. Có bản chơi (Three.js) và chế độ **headless** theo Test Contract **v1.2**. Thay đổi so với Phase 2 xem [CHANGELOG.md](CHANGELOG.md).
 
-| Đêm | Đảo | Đèn | Thời gian | Điểm nhấn |
-| :-: | :--- | :-: | :-: | :--- |
-| 1 | Đảo Bến | 5 | 300 s | đảo tròn, Bóng Mực xuất hiện từ giây thứ 5 |
-| 2 | Đảo Cau | 6 | 330 s | hai đảo nối bằng cầu tre không lan can, 2 bục nhảy, Bùa Gió, Gió Lạc |
-| 3 | Đảo Chuông | 7 | 360 s | 3 tầng, 2 dốc, bục nhảy, tháp chuông, gió mạnh, Bóng Mực 4,5 m/s |
+| Đêm | Đảo | Đèn | Thời gian | Cần sáng lúc bình minh | Điểm nhấn |
+| :-: | :--- | :-: | :-: | :-: | :--- |
+| 1 | Đảo Bến | 5 | 240 s | 3 | đảo tròn, Bóng Mực xuất hiện từ giây thứ 5 |
+| 2 | Đảo Cau | 6 | 270 s | 4 | hai đảo nối bằng cầu tre không lan can, 2 bục nhảy, Bùa Gió, Gió Lạc |
+| 3 | Đảo Chuông | 7 | 300 s | 5 | 3 tầng, 2 dốc, bục nhảy, tháp chuông, gió mạnh, Bóng Mực 4,5 m/s |
 
 ## Cài đặt và chạy (3 lệnh)
 
@@ -18,7 +18,7 @@ pnpm build
 pnpm dev        # mở http://localhost:5173
 ```
 
-Kiểm thử: `pnpm test` (build headless + 98 test, gồm tất định và regression Phase 1 với số chuẩn).
+Kiểm thử: `pnpm test` (build headless rồi chạy toàn bộ test: regression, tính năng, CLI, bot 3 Đêm, `phase3.test.ts` với 77 test, gồm tất định).
 
 ## Điều khiển
 
@@ -27,23 +27,50 @@ Kiểm thử: `pnpm test` (build headless + 98 test, gồm tất định và reg
 | `W A S D` / mũi tên | Di chuyển (theo hướng camera) |
 | `Space` | Nhảy (chỉ khi đang chạm đất) |
 | `Shift` | **Lướt**: 14 m/s trong 0,2 s, hồi 1,5 s |
-| `E` | Nạp đom đóm vào đèn gần nhất chưa sáng (trong 2 m) |
+| `E` | Thắp / thắp lại / châm dầu cho đèn nhận được gần nhất (trong 2 m) |
 | `F` | **Tỏa Sáng**: tốn 3 đom đóm, choáng và đẩy lùi Bóng Mực trong 5 m, hồi 3 s |
 | `Q` / `R` hoặc kéo chuột | Xoay camera |
 | `H` | Bật/tắt nhãn tên cho mọi vật trên màn hình |
 | `Esc` / `P` | Tạm dừng (Tiếp tục / Chơi lại Đêm / Cài đặt / Về menu) |
 | `Enter` | Bắt đầu đêm, sang đêm kế tiếp, chơi lại |
 
-Luồng: **menu → giới thiệu đêm (lời Ông Đăng) → chơi → kết quả → đêm kế tiếp**; thắng Đêm 3 tới màn **Bình Minh** với tổng điểm; thua thì chơi lại đúng đêm đó. **Cài đặt** (âm lượng, độ nhạy chuột) được lưu giữa các lần mở. Mũi tên vàng chỉ tới đèn chưa sáng gần nhất khi nó ở ngoài màn hình.
+Luồng: **menu → giới thiệu đêm (lời Ông Đăng) → chơi → kết quả → đêm kế tiếp**; thắng Đêm 3 tới màn **Bình Minh** với tổng điểm; thua thì chơi lại đúng đêm đó. **Cài đặt** (âm lượng, độ nhạy chuột, "Bảng màu dễ phân biệt") được lưu giữa các lần mở. Mũi tên vàng chỉ tới đèn chưa sáng gần nhất khi nó ở ngoài màn hình.
 
-## Số chuẩn (Ticket-02)
+## Luật Phase 3 (tóm tắt)
+
+- **Mục tiêu:** tới bình minh còn sống và có ≥ 60% số đèn đang sáng (làm tròn lên: 3/5, 4/6, 5/7). Thắp đủ đèn **không** kết thúc Đêm; thắng/thua `dawn` chỉ xét ở bình minh, hết Ngọn Lửa thì thua ngay (`no_flames`).
+- **Dầu đèn:** thắp lần đầu tốn 10 đom đóm, thắp lại đèn đã từng sáng tốn 5; đèn sáng có `fuel` 100, hao 1/s, `fuel ≤ 0` thì tắt. Mỗi đom đóm châm thêm 10 dầu. Đèn `fuel < 30` nhấp nháy và mất vùng an toàn 6 m.
+- **Bóng Mực hút dầu:** tới đèn yếu (trong 2 m) thì đứng lại hút 5 dầu/s, nhiều con cộng dồn. Tỏa Sáng trúng con đang hút thưởng +15; Mây lại gần (≤ 6 m) thì nó quay sang đuổi.
+- **Sức chứa:** `min(20, 10 + 2 × số lần thắp thành công)` trong Đêm, về 10 ở Đêm mới.
+
+## Số chuẩn (Ticket-03, Contract v1.2)
 
 - Chạy 6 m/s; nhảy 7 m/s, trọng lực −20; Lướt 14 m/s × 0,2 s, hồi 1,5 s; Bùa Gió: chạy 7,2 m/s, lướt không hồi, 10 s, hồi lại sau 45 s.
-- Mang tối đa **10** đom đóm; nhặt trong 1,0 m (XZ) và chênh cao ≤ 1,5 m. Mỗi đèn cần **10**; nạp trong 2,0 m, nhớ tiến độ. Vùng an toàn 6 m quanh đèn đã sáng.
+- Nhặt trong 1,0 m (XZ) và chênh cao ≤ 1,5 m; nạp trong 2,0 m, nhớ tiến độ nạp dở. Vùng an toàn 6 m quanh đèn có `fuel ≥ 30`.
 - Bóng Mực 4,0 m/s (Đêm 3: 4,5), phát hiện 12 m / bỏ đuổi 18 m. Bị chạm: −1 Ngọn Lửa, rơi ⌊mang/2⌋ đom đóm, bất tử 90 tick. Rơi khỏi đảo (Y < −10): −1 Ngọn Lửa, mất hết đom đóm, hồi sinh sau 60 tick.
-- Điểm: +10 mỗi đom đóm nạp, +100 mỗi đèn, +5 mỗi Bóng Mực trúng Tỏa Sáng; thắng: + ⌊giây còn lại⌋ × 2 + 50 × Ngọn Lửa còn lại. Tổng điểm game = tổng các đêm đã thắng.
 
-## Headless (Test Contract v1.1)
+### Cách tính điểm
+
+| Việc | Điểm |
+| :--- | :--- |
+| Mỗi đom đóm nạp vào đèn (thắp, thắp lại, châm dầu); nhặt không có điểm | +5 |
+| Thắp lần đầu một đèn | +100 |
+| Thắp lại một đèn đã tắt | +40 |
+| Bóng Mực trúng Tỏa Sáng | +5 mỗi con |
+| Bóng Mực đang hút dầu trúng Tỏa Sáng (thay +5) | +15 mỗi con |
+| Bình minh, **chỉ khi thắng**: mỗi đèn sáng | +50 + ⌊`fuel`⌋ |
+| Bình minh, **chỉ khi thắng**: mỗi Ngọn Lửa còn lại | +50 |
+| Thưởng thời gian còn lại | không còn (0) |
+
+Thua thì không cộng điểm bình minh. Tổng điểm game = tổng các đêm đã thắng.
+
+## Sáng tạo của tôi
+
+- Mây có lời dẫn của Ông Đăng ở mỗi đêm; nhãn tên `H` và mũi tên chỉ đèn cần chăm trên minimap.
+- Âm thanh sinh thủ tục bằng Web Audio, không dùng asset ngoài.
+- Phase 3: thanh dầu trên từng đèn, đèn yếu nhấp nháy, Bóng Mực hút dầu nhìn thấy được; chế độ **mù màu** (đổi màu Bóng Mực/cảnh báo, đèn tắt xẹp và rách giấy để nhận ra không cần màu); biểu ngữ báo lỗi khi render hỏng.
+
+## Headless (Test Contract v1.2)
 
 `game.contract.json` ở gốc repo là **nguồn duy nhất** của `tuning`: sim, bản chơi và headless đều đọc từ file này.
 
@@ -52,7 +79,7 @@ node apps/headless/dist/headless.js --seed 1 --night 1|2|3 \
   [--scenario f.json] [--inputs f.json] --ticks 600 --out out.jsonl [--snapshot-every 10]
 ```
 
-- 60 tick/giây cố định, không cửa sổ/GPU. Một Đêm đầy đủ 21.600 tick chạy dưới 1 giây (giới hạn là 30 giây).
+- 60 tick/giây cố định, không cửa sổ/GPU. Một Đêm đầy đủ (tối đa 18.000 tick) chạy nhanh hơn nhiều so với giới hạn 30 giây.
 - Mã thoát: `0` thành công · `2` inputs/scenario sai (lỗi ra stderr) · `1` lỗi dùng lệnh khác (kể cả `--night` ngoài 1–3).
 - Cùng seed + scenario + inputs cho output **giống hệt từng byte** (đã kiểm Windows/Node 24 và Linux/Node 22 trong Docker, cả 3 Đêm).
 - Input thêm `dash` và `pause` (kích hoạt khi `false → true`). Scenario thêm `player.{invuln_ticks,dash_cd_ticks,pulse_cd_ticks,charm_ticks}`, `shades[].{state,state_ticks_left}`, `drifters`, `charms`, `random_drifters`, `wind_enabled`.
@@ -65,7 +92,9 @@ docker build -t ddl-headless .
 docker run --rm -v "$PWD:/w" ddl-headless --seed 1 --night 2 --ticks 600 --out /w/out.jsonl
 ```
 
-Toàn bộ giả định xem [docs/spec/phase-2.md](docs/spec/phase-2.md) (và [docs/spec/phase-1.md](docs/spec/phase-1.md)); bằng chứng ở [docs/evidence/phase-2/](docs/evidence/phase-2/); ghi chú AI và retro ở [docs/notes/phase-2.md](docs/notes/phase-2.md).
+Snapshot/sự kiện/scenario mở rộng theo v1.2 (`fuel`, `ever_lit`, `relit_count`, `capacity`; `refuel`, `lantern_out`, `fuel_drain`; `lit`, `fuel`, `successful_lights`, `target_lantern_id`): chi tiết ở [CHANGELOG.md](CHANGELOG.md).
+
+Toàn bộ giả định xem [docs/spec/phase-3.md](docs/spec/phase-3.md) (G1 và G19 chưa được xác nhận), quyết định ở [ADR-001](docs/adr/ADR-001-lantern-state-and-win-rule.md), và [phase-2.md](docs/spec/phase-2.md), [phase-1.md](docs/spec/phase-1.md); bằng chứng Phase 3 ở [docs/evidence/phase-3/](docs/evidence/phase-3/) (Phase 2: [docs/evidence/phase-2/](docs/evidence/phase-2/)); ghi chú AI và retro ở [docs/notes/phase-2.md](docs/notes/phase-2.md).
 
 ---
 
