@@ -1,0 +1,17 @@
+{
+  "name": "@ddl/headless",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.json && esbuild src/main.ts --bundle --platform=node --format=esm --target=node22 --outfile=dist/headless.js"
+  },
+  "dependencies": {
+    "@ddl/sim": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "esbuild": "^0.25.0"
+  }
+}

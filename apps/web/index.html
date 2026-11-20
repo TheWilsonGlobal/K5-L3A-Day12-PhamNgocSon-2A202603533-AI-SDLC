@@ -1,0 +1,471 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Đảo Đèn Lồng</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="theme-color" content="#120a26" />
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        overflow: hidden;
+        background: #0b0718;
+        font-family: system-ui, sans-serif;
+        color: #ffe9c2;
+      }
+      canvas {
+        display: block;
+      }
+      #hud {
+        position: fixed;
+        top: 14px;
+        left: 14px;
+        pointer-events: none;
+        user-select: none;
+      }
+      .hud-card {
+        min-width: 252px;
+        padding: 12px 14px 10px;
+        border-radius: 16px;
+        background: linear-gradient(160deg, rgba(40, 24, 78, 0.82), rgba(16, 9, 36, 0.86));
+        border: 1px solid rgba(255, 176, 74, 0.45);
+        box-shadow:
+          0 6px 24px rgba(0, 0, 0, 0.45),
+          inset 0 0 18px rgba(255, 176, 74, 0.08);
+        backdrop-filter: blur(6px);
+        font-size: 14px;
+      }
+      .hud-card .lab {
+        flex: 0 0 76px;
+        font-size: 10.5px;
+        letter-spacing: 0.09em;
+        text-transform: uppercase;
+        color: #b9a7e8;
+      }
+      .hud-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        min-height: 28px;
+      }
+      .hud-row .icons,
+      .hud-row .pips {
+        display: flex;
+        gap: 5px;
+        flex: 1;
+      }
+      .hud-row .val {
+        min-width: 30px;
+        text-align: right;
+        font-variant-numeric: tabular-nums;
+        color: #ffe9c2;
+      }
+      .ic {
+        display: inline-flex;
+        width: 22px;
+        height: 22px;
+      }
+      .ic svg {
+        width: 100%;
+        height: 100%;
+        fill: currentColor;
+      }
+      .ic.flame {
+        color: #ff8a2a;
+        filter: drop-shadow(0 0 5px rgba(255, 138, 42, 0.8));
+        transition:
+          opacity 0.25s,
+          filter 0.25s,
+          color 0.25s;
+      }
+      .ic.flame.off {
+        color: #4a3d6e;
+        filter: none;
+        opacity: 0.55;
+      }
+      .pip {
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        background: #2a2145;
+        border: 1px solid #5a4a8a;
+        transition:
+          background 0.2s,
+          box-shadow 0.2s;
+      }
+      .pip.on {
+        background: radial-gradient(circle at 35% 30%, #fffbd0, #ffd84a 60%, #e0a020);
+        border-color: #ffe27a;
+        box-shadow: 0 0 8px rgba(255, 224, 90, 0.9);
+      }
+      .ic.lantern {
+        width: 24px;
+        height: 24px;
+        transition: filter 0.3s;
+      }
+      .ic.lantern.part {
+        filter: drop-shadow(0 0 3px rgba(255, 176, 74, 0.5));
+      }
+      .ic.lantern.lit {
+        filter: drop-shadow(0 0 7px rgba(255, 195, 90, 0.95));
+      }
+      .hud-time {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-top: 6px;
+        color: #ffe9c2;
+      }
+      .hud-time b {
+        min-width: 42px;
+        font-size: 18px;
+        font-variant-numeric: tabular-nums;
+      }
+      .bar {
+        flex: 1;
+        height: 8px;
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.1);
+        overflow: hidden;
+      }
+      .bar > i {
+        display: block;
+        height: 100%;
+        border-radius: 8px;
+        background: linear-gradient(90deg, #ffb04a, #ffe27a);
+      }
+      .hud-time.low {
+        color: #ff8a8a;
+        animation: lowpulse 0.9s ease-in-out infinite;
+      }
+      .hud-time.low .bar > i {
+        background: linear-gradient(90deg, #ff5a5a, #ff9a6a);
+      }
+      @keyframes lowpulse {
+        50% {
+          opacity: 0.55;
+        }
+      }
+      .hud-bottom {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        margin-top: 8px;
+        padding-top: 8px;
+        border-top: 1px solid rgba(255, 255, 255, 0.1);
+      }
+      .score {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        color: #ffd84a;
+      }
+      .score b {
+        font-size: 20px;
+        font-variant-numeric: tabular-nums;
+        color: #fff3c8;
+        display: inline-block;
+      }
+      .score b.bump {
+        animation: bump 0.35s ease-out;
+      }
+      @keyframes bump {
+        40% {
+          transform: scale(1.35);
+          color: #ffd84a;
+        }
+      }
+      .pulse {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        color: #8fd0ff;
+      }
+      .pulse .lab {
+        flex: 0 0 auto;
+        color: #9ec9ee;
+      }
+      .pulse .bar > i {
+        background: linear-gradient(90deg, #4a8aff, #9ad0ff);
+      }
+      .pulse .state {
+        min-width: 70px;
+        text-align: right;
+        font-size: 12px;
+      }
+      .pulse.wait {
+        color: #7a86a8;
+      }
+      .pulse.wait .bar > i {
+        background: #4a5a88;
+      }
+      .pulse.ready .ic {
+        filter: drop-shadow(0 0 5px rgba(120, 190, 255, 0.9));
+      }
+      .hud-keys {
+        margin-top: 8px;
+        font-size: 11px;
+        color: #9a8cc4;
+      }
+      #prompt {
+        position: fixed;
+        left: 50%;
+        bottom: 84px;
+        transform: translate(-50%, 8px);
+        padding: 9px 20px;
+        border-radius: 999px;
+        background: rgba(30, 18, 60, 0.88);
+        border: 1px solid rgba(255, 176, 74, 0.7);
+        box-shadow: 0 0 18px rgba(255, 176, 74, 0.35);
+        font-size: 15px;
+        opacity: 0;
+        pointer-events: none;
+        transition:
+          opacity 0.2s,
+          transform 0.2s;
+      }
+      #prompt.show {
+        opacity: 1;
+        transform: translate(-50%, 0);
+      }
+      #prompt.warn {
+        border-color: #9a86d8;
+        box-shadow: none;
+        color: #cfc4f2;
+      }
+      kbd {
+        display: inline-block;
+        padding: 0 6px;
+        margin: 0 1px;
+        border: 1px solid rgba(255, 176, 74, 0.6);
+        border-radius: 4px;
+        background: #2a1d4a;
+        font-family: inherit;
+        font-size: 0.9em;
+        color: #ffe9c2;
+      }
+      #help {
+        position: fixed;
+        bottom: 12px;
+        left: 12px;
+        font-size: 13px;
+        opacity: 0.8;
+        pointer-events: none;
+      }
+      #end {
+        position: fixed;
+        inset: 0;
+        display: none;
+        place-items: center;
+        background: rgba(8, 4, 20, 0.7);
+        text-align: center;
+      }
+      #end.show {
+        display: grid;
+      }
+      #end h1 {
+        font-size: 44px;
+        margin: 0 0 8px;
+      }
+      #end button {
+        margin-top: 18px;
+        padding: 10px 26px;
+        font-size: 18px;
+        border: 0;
+        border-radius: 8px;
+        background: #ffb04a;
+        color: #2a1600;
+        cursor: pointer;
+      }
+
+      #minimap {
+        position: fixed;
+        right: 12px;
+        bottom: 12px;
+        width: 200px;
+        height: 200px;
+        border-radius: 50%;
+        pointer-events: none;
+      }
+      #labels {
+        position: fixed;
+        inset: 0;
+        overflow: hidden;
+        pointer-events: none;
+      }
+      .lbl {
+        position: absolute;
+        left: 0;
+        top: 0;
+        padding: 2px 7px;
+        font-size: 12px;
+        white-space: nowrap;
+        border-radius: 6px;
+        background: rgba(20, 12, 40, 0.85);
+        border: 1px solid #9a86d8;
+        color: #efe8ff;
+      }
+      .lbl.may {
+        border-color: #fff;
+      }
+      .lbl.lantern {
+        border-color: #9a86d8;
+      }
+      .lbl.lit {
+        border-color: #ffc35a;
+        color: #ffe2a0;
+      }
+      .lbl.shade {
+        border-color: #a23cff;
+        color: #e0c4ff;
+      }
+      .lbl.mote {
+        border-color: #fff08a66;
+        color: #fff08a;
+        font-size: 10px;
+        padding: 0 4px;
+      }
+      #guide {
+        position: fixed;
+        inset: 0;
+        display: none;
+        place-items: center;
+        background: rgba(8, 4, 20, 0.82);
+      }
+      #guide.show {
+        display: grid;
+      }
+      #guide .card {
+        width: min(560px, calc(100vw - 32px));
+        max-height: calc(100vh - 32px);
+        overflow: auto;
+        padding: 20px 24px;
+        background: #1a1030;
+        border: 1px solid #ffb04a88;
+        border-radius: 14px;
+        line-height: 1.55;
+        font-size: 14.5px;
+      }
+      #guide h2 {
+        margin: 0 0 4px;
+        font-size: 24px;
+      }
+      #guide h3 {
+        margin: 14px 0 4px;
+        font-size: 15px;
+        color: #ffb04a;
+      }
+      #guide ul {
+        margin: 0;
+        padding-left: 20px;
+      }
+      #guide kbd {
+        padding: 0 6px;
+        border: 1px solid #ffb04a88;
+        border-radius: 4px;
+        background: #2a1d4a;
+        font-size: 13px;
+      }
+      #guide button {
+        margin-top: 14px;
+        padding: 9px 22px;
+        font-size: 16px;
+        border: 0;
+        border-radius: 8px;
+        background: #ffb04a;
+        color: #2a1600;
+        cursor: pointer;
+      }
+      .dot {
+        display: inline-block;
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        margin-right: 6px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="hud"></div>
+    <div id="prompt"></div>
+    <div id="labels"></div>
+    <canvas id="minimap"></canvas>
+    <div id="guide">
+      <div class="card">
+        <h2>⏸ Tạm dừng · Hướng dẫn</h2>
+        <div>Mây phải thắp sáng <b>5 Đèn Lồng</b> trước khi trời sáng (300 s) và còn Ngọn Lửa.</div>
+        <h3>Cách thắp một đèn</h3>
+        <ul>
+          <li>Đi qua đom đóm vàng để nhặt (tối đa 5).</li>
+          <li>
+            Lại gần một đèn chưa sáng (trong 3 m) rồi nhấn <kbd>E</kbd>:
+            <b>nạp hết số đom đóm đang mang</b> vào đèn đó, tối đa đủ 4. Mỗi đèn cần <b>đủ 4</b> mới
+            sáng.
+          </li>
+          <li>
+            <b>Nạp dở dang vẫn được giữ.</b> Mang 2 rồi nhấn E thì đèn ở mức 2/4 (chưa sáng); nhặt
+            thêm 2 và quay lại nhấn E để hoàn tất. Bị Bóng Mực chạm làm rơi bớt đom đóm nên hay gặp
+            trường hợp này.
+          </li>
+          <li>
+            Xem tiến độ từng đèn: <b>4 chấm</b> quanh bóng đèn (chấm cam = đã nạp), con số
+            <b>2/4</b> phía trên đèn, vòng cam trên bản đồ nhỏ. Bóng đèn càng nạp càng ấm và to; đèn
+            sáng hẳn có <b>✔ sáng</b> và vòng an toàn dưới chân.
+          </li>
+          <li>
+            Bóng Mực không vào được vòng 6 m quanh đèn <b>đã sáng</b> — đứng trong vòng đó là chỗ
+            nghỉ an toàn.
+          </li>
+        </ul>
+        <h3>Nguy hiểm</h3>
+        <ul>
+          <li>Bóng Mực chạm bạn: mất 1 Ngọn Lửa và rơi một nửa số đom đóm đang mang.</li>
+          <li>
+            <kbd>F</kbd> xung sáng (tốn 1 đom đóm, hồi 5 s): choáng và đẩy lùi Bóng Mực trong 8 m.
+          </li>
+        </ul>
+        <h3>Điều khiển</h3>
+        <ul>
+          <li>
+            <kbd>W A S D</kbd>/mũi tên: di chuyển · <kbd>Space</kbd>: nhảy · <kbd>Q</kbd>/<kbd
+              >R</kbd
+            >
+            hoặc kéo chuột: xoay camera
+          </li>
+          <li>
+            <kbd>H</kbd>: bật/tắt nhãn tên cho mọi vật trên màn hình ·
+            <kbd>P</kbd>/<kbd>G</kbd>/<kbd>Esc</kbd>: mở/đóng hướng dẫn này
+          </li>
+        </ul>
+        <h3>Bản đồ nhỏ (góc phải dưới)</h3>
+        <ul>
+          <li>Phía trên bản đồ là hướng camera đang nhìn.</li>
+          <li>
+            <span class="dot" style="background: #fff"></span>Mây ·
+            <span class="dot" style="background: #ffc35a"></span>đèn sáng ·
+            <span class="dot" style="background: #2a2145; border: 1px solid #9a86d8"></span>đèn chưa
+            sáng (vòng cam = tiến độ nạp) · <span class="dot" style="background: #fff08a"></span>đom
+            đóm · <span class="dot" style="background: #a23cff"></span>Bóng Mực (xanh = bị choáng)
+          </li>
+        </ul>
+        <button id="resume">Tiếp tục (P)</button>
+      </div>
+    </div>
+
+    <div id="help">
+      WASD / mũi tên: di chuyển · Space: nhảy · E: nạp đèn · F: xung sáng · Q/R hoặc kéo chuột: xoay
+      camera · H: nhãn · P: tạm dừng/hướng dẫn
+    </div>
+    <div id="end">
+      <div>
+        <h1 id="endTitle"></h1>
+        <div id="endText"></div>
+        <button id="again">Chơi lại (Enter)</button>
+      </div>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
