@@ -1,6 +1,12 @@
-# Đảo Đèn Lồng — Night 1 (Phase 1)
+# Đảo Đèn Lồng — 3 Đêm (Phase 2)
 
-Game 3D góc nhìn thứ ba: **Mây** gom đom đóm, thắp 5 Đèn Lồng Lớn trên đảo, né **Bóng Mực** và xua chúng bằng xung sáng. Có bản chơi (Three.js) và chế độ **headless** theo Test Contract v1.0.
+Game 3D góc nhìn thứ ba: **Mây** gom đom đóm, thắp các Đèn Lồng trên ba hòn đảo, né **Bóng Mực** và **Gió Lạc**, xua chúng bằng Tỏa Sáng, lướt qua nguy hiểm. Có bản chơi (Three.js) và chế độ **headless** theo Test Contract **v1.1**.
+
+| Đêm | Đảo | Đèn | Thời gian | Điểm nhấn |
+| :-: | :--- | :-: | :-: | :--- |
+| 1 | Đảo Bến | 5 | 300 s | đảo tròn, Bóng Mực xuất hiện từ giây thứ 5 |
+| 2 | Đảo Cau | 6 | 330 s | hai đảo nối bằng cầu tre không lan can, 2 bục nhảy, Bùa Gió, Gió Lạc |
+| 3 | Đảo Chuông | 7 | 360 s | 3 tầng, 2 dốc, bục nhảy, tháp chuông, gió mạnh, Bóng Mực 4,5 m/s |
 
 ## Cài đặt và chạy (3 lệnh)
 
@@ -12,65 +18,54 @@ pnpm build
 pnpm dev        # mở http://localhost:5173
 ```
 
-Kiểm thử: `pnpm test` (build headless + 42 test, gồm kiểm tra tất định).
+Kiểm thử: `pnpm test` (build headless + 98 test, gồm tất định và regression Phase 1 với số chuẩn).
 
 ## Điều khiển
 
 | Phím | Việc |
 | :--- | :--- |
 | `W A S D` / mũi tên | Di chuyển (theo hướng camera) |
-| `Space` | Nhảy |
-| `E` | Nạp đom đóm vào đèn gần nhất chưa sáng (trong 3 m) |
-| `F` | Xung sáng: choáng và đẩy lùi Bóng Mực (tốn 1 đom đóm) |
+| `Space` | Nhảy (chỉ khi đang chạm đất) |
+| `Shift` | **Lướt**: 14 m/s trong 0,2 s, hồi 1,5 s |
+| `E` | Nạp đom đóm vào đèn gần nhất chưa sáng (trong 2 m) |
+| `F` | **Tỏa Sáng**: tốn 3 đom đóm, choáng và đẩy lùi Bóng Mực trong 5 m, hồi 3 s |
 | `Q` / `R` hoặc kéo chuột | Xoay camera |
 | `H` | Bật/tắt nhãn tên cho mọi vật trên màn hình |
-| `P` / `G` / `Esc` | Tạm dừng và mở hướng dẫn (popup) |
-| `Enter` | Chơi lại sau khi thắng/thua |
+| `Esc` / `P` | Tạm dừng (Tiếp tục / Chơi lại Đêm / Cài đặt / Về menu) |
+| `Enter` | Bắt đầu đêm, sang đêm kế tiếp, chơi lại |
 
-Góc phải dưới có **bản đồ nhỏ** (phía trên = hướng camera). Đom đóm được nhặt tự động khi đi qua. Mỗi đèn cần **4** đom đóm; mang tối đa **5**.
+Luồng: **menu → giới thiệu đêm (lời Ông Đăng) → chơi → kết quả → đêm kế tiếp**; thắng Đêm 3 tới màn **Bình Minh** với tổng điểm; thua thì chơi lại đúng đêm đó. **Cài đặt** (âm lượng, độ nhạy chuột) được lưu giữa các lần mở. Mũi tên vàng chỉ tới đèn chưa sáng gần nhất khi nó ở ngoài màn hình.
 
-## Cách tính điểm
+## Số chuẩn (Ticket-02)
 
-| Sự kiện | Điểm |
-| :--- | :---: |
-| Nhặt 1 đom đóm | +10 |
-| Thắp sáng 1 đèn | +100 |
-| Xung sáng choáng 1 Bóng Mực | +20 |
-| Thắng: mỗi giây còn lại (làm tròn xuống) | +1 |
-| Thắng: mỗi Ngọn Lửa còn lại | +50 |
+- Chạy 6 m/s; nhảy 7 m/s, trọng lực −20; Lướt 14 m/s × 0,2 s, hồi 1,5 s; Bùa Gió: chạy 7,2 m/s, lướt không hồi, 10 s, hồi lại sau 45 s.
+- Mang tối đa **10** đom đóm; nhặt trong 1,0 m (XZ) và chênh cao ≤ 1,5 m. Mỗi đèn cần **10**; nạp trong 2,0 m, nhớ tiến độ. Vùng an toàn 6 m quanh đèn đã sáng.
+- Bóng Mực 4,0 m/s (Đêm 3: 4,5), phát hiện 12 m / bỏ đuổi 18 m. Bị chạm: −1 Ngọn Lửa, rơi ⌊mang/2⌋ đom đóm, bất tử 90 tick. Rơi khỏi đảo (Y < −10): −1 Ngọn Lửa, mất hết đom đóm, hồi sinh sau 60 tick.
+- Điểm: +10 mỗi đom đóm nạp, +100 mỗi đèn, +5 mỗi Bóng Mực trúng Tỏa Sáng; thắng: + ⌊giây còn lại⌋ × 2 + 50 × Ngọn Lửa còn lại. Tổng điểm game = tổng các đêm đã thắng.
 
-Thắng khi thắp đủ 5 đèn (`all_lit`). Thua khi hết 3 Ngọn Lửa (`no_flames`) hoặc hết 300 s (`dawn`). Bị Bóng Mực chạm: mất 1 Ngọn Lửa, rơi một nửa số đom đóm đang mang (làm tròn lên), bất tử 2 s. Bóng Mực không vào được vòng 6 m quanh đèn đã sáng.
+## Headless (Test Contract v1.1)
 
-## Headless (Test Contract v1.0)
-
-`game.contract.json` ở gốc repo là **nguồn duy nhất** của `tuning`: sim và bản chơi đều đọc từ file này.
+`game.contract.json` ở gốc repo là **nguồn duy nhất** của `tuning`: sim, bản chơi và headless đều đọc từ file này.
 
 ```bash
-node apps/headless/dist/headless.js --seed 1 --night 1 \
+node apps/headless/dist/headless.js --seed 1 --night 1|2|3 \
   [--scenario f.json] [--inputs f.json] --ticks 600 --out out.jsonl [--snapshot-every 10]
 ```
 
-- 60 tick/giây cố định, không cửa sổ/GPU, chạy nhanh nhất có thể (cả đêm 18000 tick ≈ 0,25 s).
-- Mã thoát: `0` thành công · `2` inputs/scenario sai (lỗi ra stderr) · `1` lỗi dùng lệnh khác.
-- Cùng seed + scenario + inputs cho output **giống hệt từng byte** (đã kiểm Windows/Node 24 và Linux/Node 22 trong Docker).
-- Ngoài các snapshot theo `--snapshot-every`, luôn ghi thêm một snapshot ở tick cuối trước dòng `end`.
+- 60 tick/giây cố định, không cửa sổ/GPU. Một Đêm đầy đủ 21.600 tick chạy dưới 1 giây (giới hạn là 30 giây).
+- Mã thoát: `0` thành công · `2` inputs/scenario sai (lỗi ra stderr) · `1` lỗi dùng lệnh khác (kể cả `--night` ngoài 1–3).
+- Cùng seed + scenario + inputs cho output **giống hệt từng byte** (đã kiểm Windows/Node 24 và Linux/Node 22 trong Docker, cả 3 Đêm).
+- Input thêm `dash` và `pause` (kích hoạt khi `false → true`). Scenario thêm `player.{invuln_ticks,dash_cd_ticks,pulse_cd_ticks,charm_ticks}`, `shades[].{state,state_ticks_left}`, `drifters`, `charms`, `random_drifters`, `wind_enabled`.
+- Ngoài các snapshot theo `--snapshot-every`, luôn ghi thêm một snapshot ở tick cuối. Sự kiện `night_start` ghi ngay sau snapshot tick 0 (với `tick: 0`).
 
 Docker (Linux, giống môi trường chấm):
 
 ```bash
 docker build -t ddl-headless .
-docker run --rm -v "$PWD:/w" ddl-headless --seed 1 --night 1 --ticks 600 --out /w/out.jsonl
+docker run --rm -v "$PWD:/w" ddl-headless --seed 1 --night 2 --ticks 600 --out /w/out.jsonl
 ```
 
-### Khái niệm không có / diễn giải trong `tuning`
-
-- `fall_enabled: false` — đảo tròn bán kính 40 m có rào vô hình; **không có rơi khỏi đảo** nên không bao giờ ghi sự kiện `player_hit` với `by: "fall"`.
-- `safe_radius` chỉ áp dụng quanh đèn **đã thắp**.
-- `hit_drop_ratio` = tỉ lệ số đom đóm đang mang bị rơi (làm tròn lên).
-- `pulse_cost` trừ vào số đom đóm đang mang; không đủ thì không xung được.
-- Trạng thái Bóng Mực: `chase`, `stunned`. Không có `dash`.
-
-Toàn bộ giả định xem [docs/spec/phase-1.md](docs/spec/phase-1.md); bằng chứng ở [docs/evidence/phase-1/](docs/evidence/phase-1/); ghi chú AI và retro ở [docs/notes/phase-1.md](docs/notes/phase-1.md).
+Toàn bộ giả định xem [docs/spec/phase-2.md](docs/spec/phase-2.md) (và [docs/spec/phase-1.md](docs/spec/phase-1.md)); bằng chứng ở [docs/evidence/phase-2/](docs/evidence/phase-2/); ghi chú AI và retro ở [docs/notes/phase-2.md](docs/notes/phase-2.md).
 
 ---
 
