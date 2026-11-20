@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { PAL } from "./palette.ts";
+import { PAL, onPaletteChange } from "./palette.ts";
 
 // Visual-only rigs. They read positions from the sim and never feed anything back.
 
@@ -234,19 +234,36 @@ export interface ShadeRig {
     z: number,
     tx: number,
     tz: number,
+    /** World position of the lantern being drained, or null when not in `drain`. */
+    drainTarget: [number, number, number] | null,
   ): void;
 }
 
 const INK_BODY = new THREE.Color(PAL.shadeBody);
 const INK_BODY_STUN = new THREE.Color(PAL.shadeStun);
 const INK_VIOLET = new THREE.Color(PAL.shadeRim);
-const STUN_BLUE = new THREE.Color(0x5aa8ff);
-const EYE_CHASE = new THREE.Color(0xf1eaff);
-const EYE_STUN = new THREE.Color(0x9ad0ff);
-const INK_EMIT = new THREE.Color(0x24104a);
-const INK_EMIT_STUN = new THREE.Color(0x103a78);
-const WISP_EMIT = new THREE.Color(0x3a1a78);
-const WISP_EMIT_STUN = new THREE.Color(0x1a4a90);
+const INK_DRAIN = new THREE.Color(PAL.shadeDrain);
+const STUN_BLUE = new THREE.Color(PAL.shadeStunGlow);
+const EYE_CHASE = new THREE.Color(PAL.shadeEye);
+const EYE_STUN = new THREE.Color(PAL.shadeEyeStun);
+const INK_EMIT = new THREE.Color(PAL.shadeInkEmit);
+const INK_EMIT_STUN = new THREE.Color(PAL.shadeInkEmitStun);
+const WISP_EMIT = new THREE.Color(PAL.shadeWispEmit);
+const WISP_EMIT_STUN = new THREE.Color(PAL.shadeWispEmitStun);
+const DRAIN_BEADS = 9;
+
+// every shade copies these each frame, so refreshing them in place re-colours all shades live
+onPaletteChange(() => {
+  INK_VIOLET.set(PAL.shadeRim);
+  INK_DRAIN.set(PAL.shadeDrain);
+  STUN_BLUE.set(PAL.shadeStunGlow);
+  EYE_CHASE.set(PAL.shadeEye);
+  EYE_STUN.set(PAL.shadeEyeStun);
+  INK_EMIT.set(PAL.shadeInkEmit);
+  INK_EMIT_STUN.set(PAL.shadeInkEmitStun);
+  WISP_EMIT.set(PAL.shadeWispEmit);
+  WISP_EMIT_STUN.set(PAL.shadeWispEmitStun);
+});
 
 /** Bóng Mực: friendly-spooky ink spirit — dark core, violet rim halo, drifting droplets, glowing eyes. */
 export function createShade(seed: number): ShadeRig {
@@ -337,20 +354,40 @@ export function createShade(seed: number): ShadeRig {
   inner.add(core, halo, eyes);
   group.add(ground);
 
+  // drain stream: beads travelling from the shade up to the lantern it is sapping
+  const streamMat = new THREE.MeshBasicMaterial({
+    color: INK_DRAIN.clone(),
+    transparent: true,
+    opacity: 0.85,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+  });
+  const beadGeo = new THREE.SphereGeometry(0.12, 8, 6);
+  const beads = Array.from({ length: DRAIN_BEADS }, () => {
+    const m = new THREE.Mesh(beadGeo, streamMat);
+    m.visible = false;
+    group.add(m);
+    return m;
+  });
+
   let face = 0;
   let stun = 0; // 0 = chasing, 1 = fully stunned (smoothed)
+  let drain = 0; // 0 = normal, 1 = draining a lantern (smoothed)
   const base = seed * 1.7;
 
   return {
     group,
-    update(t, dtRaw, stunned, x, z, tx, tz) {
+    update(t, dtRaw, stunned, x, z, tx, tz, drainTarget) {
       const dt = Math.min(Math.max(dtRaw, 1e-4), 0.1);
       const tt = t + base;
       stun += ((stunned ? 1 : 0) - stun) * Math.min(1, dt * 10);
-      group.position.set(x, 0, z);
+      drain += ((drainTarget ? 1 : 0) - drain) * Math.min(1, dt * 10);
+      group.position.x = x;
+      group.position.z = z;
 
-      const lookX = tx - x;
-      const lookZ = tz - z;
+      // while draining the shade looks at its lantern, otherwise at the player
+      const lookX = (drainTarget ? drainTarget[0] : tx) - x;
+      const lookZ = (drainTarget ? drainTarget[2] : tz) - z;
       if (!stunned && Math.hypot(lookX, lookZ) > 0.05)
         face = turn(face, Math.atan2(lookX, lookZ), dt * 8);
       inner.rotation.y = face;
@@ -360,8 +397,9 @@ export function createShade(seed: number): ShadeRig {
       inner.scale.set(1 + 0.12 * stun, 1 - 0.12 * stun, 1 + 0.12 * stun);
 
       // colours: violet while chasing, cool blue when stunned
-      haloMat.color.copy(INK_VIOLET).lerp(STUN_BLUE, stun);
-      haloMat.opacity = 0.55 - 0.22 * stun + Math.sin(tt * 3) * 0.05 * (1 - stun);
+      haloMat.color.copy(INK_VIOLET).lerp(STUN_BLUE, stun).lerp(INK_DRAIN, drain);
+      haloMat.opacity =
+        0.55 - 0.22 * stun + Math.sin(tt * 3) * 0.05 * (1 - stun) + 0.2 * drain * Math.sin(tt * 6);
       groundMat.color.copy(haloMat.color);
       ink.color.copy(INK_BODY).lerp(INK_BODY_STUN, stun);
       ink.emissive.copy(INK_EMIT).lerp(INK_EMIT_STUN, stun);
@@ -392,6 +430,21 @@ export function createShade(seed: number): ShadeRig {
         const sway = Math.sin(tt * 2.4 + w.ang * 2) * 0.12 * drift;
         w.m.position.set(Math.cos(w.ang) * (0.5 + sway), 0.42, Math.sin(w.ang) * (0.5 + sway));
       }
+      // drain stream: beads flow from the shade's head to the lantern, in group-local space
+      streamMat.color.copy(INK_DRAIN);
+      streamMat.opacity = 0.85 * drain;
+      const tgt = drainTarget;
+      beads.forEach((b, i) => {
+        b.visible = tgt !== null;
+        if (!tgt) return;
+        const u = (t * 0.7 + i / DRAIN_BEADS) % 1;
+        const lx = tgt[0] - x;
+        const ly = tgt[1] - group.position.y;
+        const lz = tgt[2] - z;
+        const wob = Math.sin(u * Math.PI * 3 + t * 6 + i) * 0.25 * Math.sin(u * Math.PI);
+        b.position.set(lx * u + wob, 1.4 + (ly - 1.4) * u, lz * u - wob);
+        b.scale.setScalar(0.6 + 0.8 * Math.sin(u * Math.PI));
+      });
       for (const s of stars) {
         s.m.visible = stun > 0.5;
         const a = s.ph + tt * 3.2;

@@ -321,7 +321,7 @@ describe("pause (Esc / P)", () => {
 
 describe("Night 2 — Đảo Cau", () => {
   const n2 = { night: 2 } as const;
-  it("has 6 lanterns at the standard coordinates and a 330 s clock", () => {
+  it("has 6 lanterns at the standard coordinates and a 270 s clock", () => {
     const s = run({ ticks: 0, ...n2 }).snaps[0]!;
     expect(s.lanterns.map((l: { pos: number[] }) => l.pos)).toEqual([
       [0, 0, 20],
@@ -331,7 +331,7 @@ describe("Night 2 — Đảo Cau", () => {
       [87, 0, -10],
       [53, 0, -10],
     ]);
-    expect(s).toMatchObject({ night: 2, time_left_s: 330 });
+    expect(s).toMatchObject({ night: 2, time_left_s: 270 });
   });
   it("starts with 20 fireflies on 24 points; Shades spawn 2 at 300, then every 420 ticks, cap 8", () => {
     const d = run({
@@ -426,11 +426,11 @@ describe("Night 2 — Đảo Cau", () => {
 describe("Night 3 — Đảo Chuông", () => {
   const n3 = { night: 3 } as const;
   const sc = (pos: V3, extra: object = {}) => ({ scenario: { player: { pos }, ...extra } });
-  it("has 7 lanterns (L1 on the top tier), a 360 s clock and starts on solid ground", () => {
+  it("has 7 lanterns (L1 on the top tier), a 300 s clock and starts on solid ground", () => {
     const s = run({ ticks: 0, ...n3 }).snaps[0]!;
     expect(s.lanterns).toHaveLength(7);
     expect(s.lanterns[0].pos).toEqual([0, 6, 6]);
-    expect(s).toMatchObject({ night: 3, time_left_s: 360 });
+    expect(s).toMatchObject({ night: 3, time_left_s: 300 });
     expect(s.player.grounded).toBe(true);
   });
   it("starts with 20 of 30 fireflies on the three tiers; Shades spawn every 360 ticks, cap 10", () => {

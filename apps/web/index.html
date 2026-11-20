@@ -12,7 +12,6 @@
         --mist: #1b2350;
         --gold: #f2c14e;
         --text: #f5f1e6;
-        --danger: #ff5a5f;
         --lamp: #ffb347;
       }
       html,
@@ -178,6 +177,9 @@
         border-color: #ffe58a;
         box-shadow: 0 0 8px rgba(255, 229, 138, 0.85);
       }
+      .cell.hide {
+        display: none;
+      }
       .fcount b {
         font-variant-numeric: tabular-nums;
       }
@@ -229,9 +231,26 @@
       [data-r="pulseBox"].ready {
         --col: #9ad0ff;
       }
+      #fatalBanner {
+        position: fixed;
+        top: 8px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 100;
+        max-width: 90vw;
+        padding: 8px 14px;
+        border: 2px solid var(--text);
+        border-radius: 6px;
+        background: var(--sky);
+        color: var(--text);
+        font: 600 14px/1.4 monospace;
+      }
+      #fatalBanner[hidden] {
+        display: none;
+      }
       [data-r="charmBox"] {
-        --col: #ff5a5f;
-        color: #ffb0b3;
+        --col: var(--danger);
+        color: var(--text);
       }
       [data-r="charmBox"].gone {
         opacity: 0.4;
@@ -333,7 +352,7 @@
         color: #ffe9b0;
       }
       .lbl.shade {
-        border-color: #7a3cff;
+        border-color: var(--shade-rim);
         color: #d9c8ff;
       }
       .lbl.drifter {
@@ -470,6 +489,25 @@
         width: 100%;
         accent-color: var(--lamp);
       }
+      .field.check {
+        grid-template-columns: 22px 1fr;
+      }
+      .field.check input {
+        width: 20px;
+        height: 20px;
+        margin: 0;
+        accent-color: var(--lamp);
+      }
+      .field.check input:focus-visible,
+      input[type="range"]:focus-visible {
+        outline: 2px solid var(--gold);
+        outline-offset: 3px;
+      }
+      /* colour-blind palette: warnings also carry a glyph, not only a colour */
+      html.cb .z.tc.low b::before,
+      html.cb #prompt.warn::before {
+        content: "\26A0\FE0E\00a0";
+      }
       .guide {
         text-align: left;
         font-size: 14.5px;
@@ -593,31 +631,53 @@
           <input id="optSens" type="range" min="20" max="300" step="5" />
           <span id="optSensV"></span>
         </div>
+        <div class="field check">
+          <input id="optColorBlind" type="checkbox" />
+          <label for="optColorBlind">Bảng màu dễ phân biệt</label>
+        </div>
         <div class="sub">Tự động lưu cho các lần mở sau.</div>
         <button id="btnSettingsBack">Quay lại</button>
       </div>
     </div>
+
+    <div id="fatalBanner" role="alert" hidden></div>
 
     <!-- guide -->
     <div id="guide" class="screen">
       <div class="card guide">
         <h2 style="text-align: center">Hướng dẫn</h2>
         <div>
-          Thắp sáng <b>mọi đèn lồng</b> của đêm trước khi trời sáng và khi còn Ngọn Lửa. Qua ba đêm
-          (Đảo Bến, Đảo Cau, Đảo Chuông) sẽ tới Bình Minh.
+          Giữ cho đủ đèn lồng cháy đến khi trời sáng và còn Ngọn Lửa. Đêm 1 cần <b>3/5</b> đèn sáng,
+          Đêm 2 <b>4/6</b>, Đêm 3 <b>5/7</b> (từ 60%). Đêm dài 240 / 270 / 300 s. Qua ba đêm (Đảo
+          Bến, Đảo Cau, Đảo Chuông) sẽ tới Bình Minh. Thua khi hết Ngọn Lửa, hoặc trời sáng mà không
+          đủ đèn sáng.
         </div>
         <h3>Thắp đèn</h3>
         <ul>
-          <li>Đi qua đom đóm vàng để nhặt (tối đa <b>10</b>).</li>
           <li>
-            Lại gần đèn chưa sáng (trong <b>2 m</b>) rồi nhấn <kbd>E</kbd>: nạp tối đa số đom đóm
-            đèn còn thiếu. Mỗi đèn cần <b>đủ 10</b>; nạp dở dang vẫn được nhớ. Mỗi đom đóm nạp +10
-            điểm, mỗi đèn sáng +100.
+            Đi qua đom đóm vàng để nhặt. Sức chứa ban đầu <b>10</b>, tăng thêm <b>2</b> sau mỗi lần
+            thắp sáng thành công (thắp lại cũng tính), tối đa <b>20</b>.
           </li>
           <li>
-            Quanh đèn đã sáng có vòng <b>6 m</b> mà Bóng Mực không vào được — chỗ nghỉ an toàn.
+            Lại gần đèn (trong <b>2 m</b>) rồi nhấn <kbd>E</kbd>. Thắp lần đầu tốn <b>10</b> đom
+            đóm; thắp lại đèn đã tắt tốn <b>5</b>. Nạp dở dang vẫn được nhớ.
           </li>
-          <li>Thắng đêm: + giây còn lại × 2 + 50 điểm mỗi Ngọn Lửa còn lại.</li>
+          <li>
+            Đèn cháy hết <b>1 nhiên liệu/giây</b>, tối đa <b>100</b>. Đèn đang sáng nhận đom đóm để
+            tiếp nhiên liệu: mỗi đom đóm +<b>10</b>. Hết nhiên liệu đèn sẽ tắt.
+          </li>
+          <li>
+            Quanh đèn đã sáng có vòng <b>6 m</b> mà Bóng Mực không vào được. Dưới <b>30</b> nhiên
+            liệu đèn nhấp nháy, mất vùng an toàn và Bóng Mực có thể tới hút nhiên liệu (5/giây).
+          </li>
+          <li>
+            Điểm: +5 mỗi đom đóm nạp (thắp, thắp lại, tiếp nhiên liệu), +100 thắp lần đầu, +40 thắp
+            lại, +5 mỗi Bóng Mực bị choáng (+15 nếu nó đang hút đèn).
+          </li>
+          <li>
+            Khi thắng đêm: mỗi đèn còn sáng +50 + phần nguyên nhiên liệu, mỗi Ngọn Lửa còn lại +50.
+            Không có điểm thưởng thời gian.
+          </li>
         </ul>
         <h3>Nguy hiểm</h3>
         <ul>
@@ -679,7 +739,7 @@
             <span class="dot" style="background: #ffb347"></span>đèn sáng ·
             <span class="dot" style="background: #2a2a3a; border: 1px solid #8a8fa6"></span>đèn chưa
             sáng · <span class="dot" style="background: #fff6c2"></span>đom đóm ·
-            <span class="dot" style="background: #7a3cff"></span>Bóng Mực
+            <span class="dot" style="background: var(--shade-rim)"></span>Bóng Mực
           </li>
         </ul>
         <div style="text-align: center; margin-top: 14px">

@@ -6,7 +6,7 @@ import { createMay, createShade, type ShadeRig } from "./characters.ts";
 import { createCharm, createDrifter, type CharmRig, type DrifterRig } from "./creatures.ts";
 import { createHud } from "./hud.ts";
 import { MINIMAP_SIZE, drawMinimap, updateArrow, updateLabels } from "./overlay.ts";
-import { PAL } from "./palette.ts";
+import { PAL, css, isColorBlind, onPaletteChange, setColorBlind } from "./palette.ts";
 import { loadSettings, saveSettings } from "./settings.ts";
 import { buildWorld, renderTerrain, type TerrainImage, type World } from "./world.ts";
 
@@ -74,11 +74,57 @@ const lanternGroup = new THREE.Group();
 scene.add(lanternGroup);
 interface LanternRig {
   glow: THREE.Mesh;
+  /** torn-paper patches on the glow; shown only while the lantern is unlit */
+  tears: THREE.Group;
   core: THREE.Mesh;
   light: THREE.PointLight;
   ring: THREE.Mesh;
   pips: THREE.Mesh[];
   baseY: number;
+  bar: THREE.Group;
+  barFill: THREE.Mesh;
+}
+const BAR_W = 1.8;
+const BAR_H = 0.2;
+/** An unlit lantern is collapsed to this fraction of its height (a shape cue, independent of colour). */
+const COLLAPSE_Y = 0.8;
+const GLOW_R = 0.7;
+
+// jagged torn-paper patch (local XY plane, normal +Z); shared by every lantern
+const tearGeo = new THREE.ShapeGeometry(
+  new THREE.Shape(
+    [
+      [-0.2, 0.05],
+      [-0.1, 0.22],
+      [0, 0.08],
+      [0.1, 0.3],
+      [0.18, 0.1],
+      [0.12, -0.05],
+      [0.2, -0.25],
+      [0.02, -0.12],
+      [-0.08, -0.28],
+      [-0.12, -0.1],
+    ].map(([x, y]) => new THREE.Vector2(x, y)),
+  ),
+);
+const tearMat = new THREE.MeshBasicMaterial({ color: PAL.lanternTear, side: THREE.DoubleSide });
+function makeTears(): THREE.Group {
+  const g = new THREE.Group();
+  for (let i = 0; i < 3; i++) {
+    const az = (i * 2 * Math.PI) / 3 + 0.4;
+    const el = 0.12 + 0.1 * i;
+    const dir = new THREE.Vector3(
+      Math.cos(el) * Math.sin(az),
+      Math.sin(el),
+      Math.cos(el) * Math.cos(az),
+    );
+    const m = new THREE.Mesh(tearGeo, tearMat);
+    m.position.copy(dir).multiplyScalar(GLOW_R * 0.985);
+    m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), dir);
+    m.rotateZ(i * 1.7);
+    g.add(m);
+  }
+  return g;
 }
 const lanternRigs = new Map<string, LanternRig>();
 const moteRigs = new Map<string, THREE.Group>();
@@ -169,10 +215,12 @@ function loadNight(n: NightNo, seed: number): void {
     pole.position.set(l.pos[0], l.pos[1] + 2, l.pos[2]);
     const baseY = l.pos[1] + 4.4;
     const glow = new THREE.Mesh(
-      new THREE.SphereGeometry(0.7, 18, 14),
+      new THREE.SphereGeometry(GLOW_R, 18, 14),
       new THREE.MeshBasicMaterial({ color: PAL.lanternOff }),
     );
     glow.position.set(l.pos[0], baseY, l.pos[2]);
+    const tears = makeTears();
+    glow.add(tears);
     const core = new THREE.Mesh(
       new THREE.SphereGeometry(0.4, 14, 10),
       new THREE.MeshBasicMaterial({ color: PAL.lanternCore }),
@@ -203,11 +251,32 @@ function loadNight(n: NightNo, seed: number): void {
       pips.push(pip);
       lanternGroup.add(pip);
     }
-    lanternGroup.add(pole, glow, core, light, ring);
-    lanternRigs.set(l.id, { glow, core, light, ring, pips, baseY });
+    // fuel bar: a billboard above the lantern, only shown while lit
+    const bar = new THREE.Group();
+    bar.position.set(l.pos[0], baseY + 1.5, l.pos[2]);
+    bar.visible = false;
+    const barMat = (color: number) =>
+      new THREE.MeshBasicMaterial({
+        color,
+        transparent: true,
+        depthTest: false,
+        side: THREE.DoubleSide,
+      });
+    const track = new THREE.Mesh(
+      new THREE.PlaneGeometry(BAR_W + 0.12, BAR_H + 0.12),
+      barMat(PAL.fuelTrack),
+    );
+    track.renderOrder = 10;
+    const barFill = new THREE.Mesh(new THREE.PlaneGeometry(BAR_W, BAR_H), barMat(PAL.fuelFill));
+    barFill.renderOrder = 11;
+    barFill.position.z = 0.01;
+    bar.add(track, barFill);
+    lanternGroup.add(pole, glow, core, light, ring, bar);
+    lanternRigs.set(l.id, { glow, tears, core, light, ring, pips, baseY, bar, barFill });
   }
   yaw = 0;
   hud.reset();
+  gameOverReason = null;
   lastTimeTick = -1;
   wasWarning = false;
 }
@@ -290,6 +359,22 @@ function retryNight(): void {
   openIntro(night);
 }
 
+// game_over.reason (contract v1.2) -> result screen text; anything else renders as unknown
+const RESULT_TEXT: Record<string, { title: string; detail: string }> = {
+  dawn_survived: {
+    title: "Đảo đã sáng đèn! 🏮",
+    detail: "Sống sót đến bình minh",
+  },
+  dawn: {
+    title: "Bình minh đến, nhưng đèn chưa đủ sáng…",
+    detail: "Chưa đủ đèn sáng khi bình minh",
+  },
+  no_flames: {
+    title: "Sương đen nuốt mất ánh sáng…",
+    detail: "Hết Ngọn Lửa",
+  },
+};
+
 function showResult(): void {
   const won = sim.outcome === "won";
   screen = "result";
@@ -298,11 +383,14 @@ function showResult(): void {
   if (won) nightScores[night - 1] = sim.score;
   const lit = sim.lanterns.filter((l) => l.lit).length;
   $("resKicker").textContent = `Đêm ${night} · ${NIGHTS[night].name}`;
-  $("resTitle").textContent = won ? "Đảo đã sáng đèn! 🏮" : "Sương đen nuốt mất ánh sáng…";
+  const reason = RESULT_TEXT[String(gameOverReason)];
+  $("resTitle").textContent = reason
+    ? reason.title
+    : `Kết thúc không rõ lý do (reason: ${String(gameOverReason)})`;
   const rows: [string, string][] = [
+    ["Kết quả", reason ? reason.detail : `không rõ: ${String(gameOverReason)}`],
     ["Đèn đã thắp", `${lit}/${sim.lanterns.length}`],
     ["Ngọn Lửa còn lại", String(Math.max(0, sim.flames))],
-    ["Giây còn lại", String(Math.floor(sim.timeLeft))],
     ["Điểm đêm này", String(sim.score)],
     ["Tổng điểm game", String(totalScore())],
   ];
@@ -389,7 +477,9 @@ $("btnGuideBack").addEventListener("click", closeOverlay);
 // settings sliders (saved on every change)
 const optVolume = $<HTMLInputElement>("optVolume");
 const optSens = $<HTMLInputElement>("optSens");
+const optColorBlind = $<HTMLInputElement>("optColorBlind");
 const syncSettingsUi = () => {
+  optColorBlind.checked = settings.colorBlind;
   optVolume.value = String(Math.round(settings.volume * 100));
   optSens.value = String(Math.round(settings.sensitivity * 100));
   $("optVolumeV").textContent = `${Math.round(settings.volume * 100)}%`;
@@ -401,6 +491,11 @@ optVolume.addEventListener("input", () => {
   audio.setVolume(settings.volume);
   saveSettings(settings);
   syncSettingsUi();
+});
+optColorBlind.addEventListener("change", () => {
+  settings.colorBlind = optColorBlind.checked;
+  saveSettings(settings);
+  setColorBlind(settings.colorBlind); // live: tokens + CSS vars switch now, no reload
 });
 optSens.addEventListener("input", () => {
   settings.sensitivity = Number(optSens.value) / 100;
@@ -466,6 +561,7 @@ let shake = 0;
 let lastTimeTick = -1;
 let wasWarning = false;
 let prevJump = false;
+let gameOverReason: unknown = null; // `reason` of the last game_over event, shown on the result screen
 
 function onEvent(e: SimEvent): void {
   const map: Partial<Record<SimEvent["name"], Sfx>> = {
@@ -486,6 +582,7 @@ function onEvent(e: SimEvent): void {
     shake = 0.5;
   }
   if (e.name === "game_over") {
+    gameOverReason = e.data.reason;
     audio.sfx(e.data.result === "won" ? "win" : "lose");
     resultTimer = performance.now() + 1100;
   }
@@ -531,13 +628,29 @@ function frame(now: number): void {
     resultTimer = 0;
     showResult();
   }
-  render(now / 1000, playing);
+  try {
+    render(now / 1000, playing);
+  } catch (e) {
+    showFatal(e);
+    throw e; // stop the loop: do not pretend the game is still running
+  }
   requestAnimationFrame(frame);
+}
+
+function showFatal(e: unknown): void {
+  const el = document.getElementById("fatalBanner");
+  if (el) {
+    el.textContent = `Lỗi hiển thị, trò chơi đã dừng: ${e instanceof Error ? e.message : String(e)}`;
+    el.hidden = false;
+  }
+  console.error("render failed", e);
 }
 
 function render(t: number, playing: boolean): void {
   const dt = lastT === 0 ? 1 / 60 : Math.min(0.1, t - lastT);
   lastT = t;
+  // read-only view of the sim's public snapshot: fuel (display units) and capacity come from here
+  const snap = sim.snapshot();
   const [px, py, pz] = sim.pos;
   may.update(t, playing ? dt : 1e-4, px, py, pz);
   may.group.visible = !(sim.invuln > 0 && Math.floor(t * 12) % 2 === 0) && sim.respawnWait === 0;
@@ -574,8 +687,14 @@ function render(t: number, playing: boolean): void {
       entityGroup.add(rig.group);
     }
     // the rig is positioned at ground level; the sim keeps the body centre 1 m above it
-    rig.update(t, dt, s.state === "stunned", s.pos[0], s.pos[2], px, pz);
     rig.group.position.y = s.pos[1] - 1;
+    let drainTarget: [number, number, number] | null = null;
+    if (s.state === "drain") {
+      const tl = sim.lanterns.find((l) => l.id === s.target_lantern_id);
+      if (!tl) throw new Error(`shade ${s.id} in drain without a known target lantern`);
+      drainTarget = [tl.pos[0], tl.pos[1] + 4.4, tl.pos[2]];
+    }
+    rig.update(t, dt, s.state === "stunned", s.pos[0], s.pos[2], px, pz, drainTarget);
     rig.group.scale.setScalar(
       s.state === "spawning" ? 0.35 + 0.65 * (1 - Math.min(1, s.left / 60)) : 1,
     );
@@ -618,9 +737,14 @@ function render(t: number, playing: boolean): void {
   }
 
   let lit = 0;
-  for (const l of sim.lanterns) {
+  // 1 Hz blink for low fuel: on for the first half of every second
+  const blinkOn = t % 1 < 0.5;
+  for (const [i, l] of sim.lanterns.entries()) {
     const lr = lanternRigs.get(l.id);
     if (!lr) continue;
+    const sl = snap.lanterns[i];
+    if (sl?.id !== l.id) throw new Error(`snapshot lantern order mismatch at ${l.id}`);
+    const lowFuel = l.lit && sl.fuel < T.low_fuel_threshold;
     const frac = l.lit ? 1 : l.deposited / T.lantern_cost;
     if (l.lit) lit++;
     // dim grey-violet when off, warm amber as it fills, bright core when lit
@@ -629,6 +753,32 @@ function render(t: number, playing: boolean): void {
     lr.core.visible = l.lit || frac > 0.3;
     lr.core.scale.setScalar(l.lit ? 1.2 + Math.sin(t * 5) * 0.05 : frac * 0.8);
     lr.light.intensity = l.lit ? 60 + Math.sin(t * 5 + idSeed(l.id)) * 6 : 3 + frac * 22;
+    // unlit: collapsed to 80% height with its bottom kept in place, and torn paper showing
+    lr.tears.visible = !l.lit;
+    if (l.lit) {
+      lr.glow.position.y = lr.baseY;
+      lr.core.position.y = lr.baseY;
+    } else {
+      lr.glow.scale.y *= COLLAPSE_Y;
+      lr.core.scale.y *= COLLAPSE_Y;
+      lr.glow.position.y = lr.baseY - GLOW_R * lr.glow.scale.x * (1 - COLLAPSE_Y);
+      lr.core.position.y = lr.glow.position.y;
+    }
+    if (lowFuel && !blinkOn) {
+      lr.light.intensity *= 0.2;
+      lr.glow.scale.multiplyScalar(0.8);
+      lr.core.visible = false;
+    }
+    lr.bar.visible = l.lit && (!lowFuel || blinkOn);
+    if (l.lit) {
+      const f = Math.min(1, Math.max(0, sl.fuel / T.fuel_max));
+      lr.barFill.scale.x = Math.max(f, 1e-3);
+      lr.barFill.position.x = -(BAR_W / 2) * (1 - f);
+      (lr.barFill.material as THREE.MeshBasicMaterial).color.setHex(
+        lowFuel ? PAL.danger : PAL.fuelFill,
+      );
+      lr.bar.quaternion.copy(camera.quaternion);
+    }
     lr.pips.forEach((p, i) =>
       (p.material as THREE.MeshBasicMaterial).color.setHex(
         l.lit || i < l.deposited ? PAL.lanternOn : PIP_OFF,
@@ -659,15 +809,24 @@ function render(t: number, playing: boolean): void {
   }
 
   if (screen === "play" || screen === "result") {
-    hud.update(sim, helpLabels);
-    drawMinimap(miniCtx, sim, yaw, T, terrain, helpLabels);
-    updateLabels(labelsEl, labelPool, sim, camera, T, helpLabels);
+    hud.update(sim, snap, helpLabels);
+    drawMinimap(miniCtx, sim, snap, yaw, T, terrain, helpLabels, blinkOn);
+    updateLabels(labelsEl, labelPool, sim, snap, camera, T, helpLabels);
     updateArrow(arrowEl, sim, camera);
   }
   renderer.render(scene, camera);
 }
 
 // ---------------------------------------------------------------- boot
+// CSS reads the warning / shade colours from the palette so there is one place to change them
+// (re-applied on boot and on every palette switch); the `cb` class turns on the warning glyphs
+onPaletteChange(() => {
+  const root = document.documentElement;
+  root.style.setProperty("--danger", css(PAL.danger));
+  root.style.setProperty("--shade-rim", css(PAL.shadeRim));
+  root.classList.toggle("cb", isColorBlind());
+});
+setColorBlind(settings.colorBlind);
 loadNight(1, SEED_BASE);
 setHudVisible(false);
 requestAnimationFrame(frame);
@@ -680,6 +839,15 @@ if (import.meta.env.DEV) {
     },
     get fps() {
       return fps.value;
+    },
+    /** toggle the colour-blind palette exactly like the settings checkbox (persists too) */
+    setColorBlind(on: boolean) {
+      optColorBlind.checked = on;
+      optColorBlind.dispatchEvent(new Event("change"));
+    },
+    /** lantern id -> { glow, tears, core, bar, ... } three.js objects, for visual assertions */
+    get lanternRigs() {
+      return lanternRigs;
     },
   };
 }

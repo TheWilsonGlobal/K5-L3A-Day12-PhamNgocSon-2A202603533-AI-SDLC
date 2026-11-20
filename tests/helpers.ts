@@ -53,6 +53,9 @@ export function run(o: RunOpts): { lines: Line[]; events: Line[]; snaps: Line[];
   };
 }
 
+/** Fuel (as written in a scenario) that a lit lantern burns through in exactly `n` ticks of decay. */
+export const fuelFromTicks = (n: number): number => n / 60;
+
 export const last = <A>(a: A[]): A => a[a.length - 1]!;
 export const named = (events: Line[], name: string): Line[] =>
   events.filter((e) => e.name === name);

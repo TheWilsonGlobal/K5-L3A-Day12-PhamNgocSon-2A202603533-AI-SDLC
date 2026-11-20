@@ -1,4 +1,6 @@
-import type { Sim, Tuning } from "@ddl/sim";
+import type { Sim, Snapshot, Tuning } from "@ddl/sim";
+
+const idNum = (id: string): number => Number(id.slice(1));
 
 const ICON = {
   flame:
@@ -16,7 +18,7 @@ const ICON = {
 };
 
 export interface Hud {
-  update(sim: Sim, helpLabels: boolean): void;
+  update(sim: Sim, snap: Snapshot, helpLabels: boolean): void;
   reset(): void;
 }
 
@@ -30,7 +32,7 @@ export function createHud(root: HTMLElement, promptEl: HTMLElement, T: Tuning): 
     { length: T.flames },
     () => `<i class="ic flame">${ICON.flame}</i>`,
   ).join("");
-  const cells = Array.from({ length: T.carry_capacity }, () => '<i class="cell"></i>').join("");
+  const cells = Array.from({ length: T.capacity_max }, () => '<i class="cell"></i>').join("");
 
   root.innerHTML = `
     <div class="z tl"><span class="lab">Ngọn Lửa</span><span class="flames" data-r="flames">${flames}</span></div>
@@ -94,10 +96,14 @@ export function createHud(root: HTMLElement, promptEl: HTMLElement, T: Tuning): 
       cache.clear();
       lastScore = 0;
     },
-    update(sim, helpLabels) {
+    update(sim, snap, helpLabels) {
+      const cap = snap.player.capacity;
       flameEls.forEach((f, i) => setCls(`f${i}`, f, "off", i >= sim.flames));
-      cellEls.forEach((c, i) => setCls(`c${i}`, c, "on", i < sim.carried));
-      setText("carryN", el.carryN, `${sim.carried}/${T.carry_capacity}`);
+      cellEls.forEach((c, i) => {
+        setCls(`c${i}`, c, "on", i < sim.carried);
+        setCls(`c${i}`, c, "hide", i >= cap);
+      });
+      setText("carryN", el.carryN, `${snap.player.carried}/${cap}`);
 
       const left = Math.ceil(sim.timeLeft);
       setText(
@@ -147,15 +153,25 @@ export function createHud(root: HTMLElement, promptEl: HTMLElement, T: Tuning): 
       setText("charmSt", el.charmSt, sim.charm > 0 ? `${(sim.charm / 60).toFixed(1)}s` : "—");
       setText("hOn", el.hOn, helpLabels ? " · đang bật" : "");
 
-      const near = sim.lanterns.find(
-        (l) =>
-          !l.lit && Math.hypot(l.pos[0] - sim.pos[0], l.pos[2] - sim.pos[2]) <= T.interact_radius,
-      );
+      // display hint only: nearest eligible lantern in range (tie: lower id); the sim decides the action
+      let near: Snapshot["lanterns"][number] | undefined;
+      let nearD = Infinity;
+      for (const l of snap.lanterns) {
+        if (l.lit && l.fuel >= T.fuel_max) continue;
+        const d = Math.hypot(l.pos[0] - sim.pos[0], l.pos[2] - sim.pos[2]);
+        if (d > T.interact_radius) continue;
+        if (d < nearD || (d === nearD && near && idNum(l.id) < idNum(near.id))) {
+          near = l;
+          nearD = d;
+        }
+      }
       if (near && sim.outcome === null) {
+        const cost = near.ever_lit ? T.relight_cost : T.lantern_cost;
+        const progress = near.lit ? "" : ` (${near.deposited}/${cost})`;
         const msg =
-          sim.carried > 0
-            ? `<kbd>E</kbd> — Nạp ánh sáng (${near.deposited}/${T.lantern_cost})`
-            : `Đèn ${near.id} (${near.deposited}/${T.lantern_cost}) cần đom đóm — hãy đi nhặt thêm`;
+          snap.player.carried > 0
+            ? `<kbd>E</kbd> — ${near.lit ? "Châm dầu" : "Nạp ánh sáng"}${progress}`
+            : `Đèn ${near.id}${progress} cần đom đóm — hãy đi nhặt thêm`;
         if (cache.get("prompt") !== msg) {
           cache.set("prompt", msg);
           promptEl.innerHTML = msg;

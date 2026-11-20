@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { InputError, parseInputs, parseScenario } from "../packages/sim/src/index.ts";
 import { T, at, last, named, run } from "./helpers.ts";
 
-describe("contract v1.1", () => {
+describe("contract v1.2", () => {
   it("carries the standard numbers", () => {
     expect(T).toMatchObject({
       player_speed: 6,
@@ -24,15 +24,23 @@ describe("contract v1.1", () => {
       dash_speed: 14,
       dash_duration_s: 0.2,
       dash_cooldown_s: 1.5,
-      night1_duration_s: 300,
-      night2_duration_s: 330,
-      night3_duration_s: 360,
+      night1_duration_s: 240, // Ticket-03 [THAY THẾ]: 300/330/360 -> 240/270/300
+      night2_duration_s: 270,
+      night3_duration_s: 300,
       fall_enabled: true,
+      fuel_max: 100,
+      fuel_decay_per_s: 1,
+      fuel_per_mote: 10,
+      relight_cost: 5,
+      win_ratio: 0.6,
+      drain_per_s: 5,
+      low_fuel_threshold: 30,
+      capacity_max: 20,
       score: {
-        per_mote: 10,
+        per_mote: 5, // Ticket-03 [THAY THẾ]: 10 -> 5, time bonus 2 -> 0
         per_lantern: 100,
         per_stun: 5,
-        per_second_left: 2,
+        per_second_left: 0,
         per_flame_left: 50,
       },
     });
@@ -125,7 +133,7 @@ type Line2 = { pos: number[]; kind: string; ttl_s: number | null };
 describe("lanterns", () => {
   const atL1 = [0, 0, 25] as [number, number, number];
 
-  it("deposits min(carried, missing), remembers progress and scores 10 per firefly", () => {
+  it("deposits min(carried, missing), remembers progress and scores 5 per firefly", () => {
     const r = run({
       ticks: 5,
       scenario: { player: { pos: atL1, carried: 4 } },
@@ -139,7 +147,7 @@ describe("lanterns", () => {
       data: { lantern_id: "L1", amount: 4, deposited: 4 },
     });
     expect(named(r.events, "lantern_lit")).toHaveLength(0);
-    expect(last(r.snaps).score).toBe(40);
+    expect(last(r.snaps).score).toBe(4 * 5); // per_mote 5 (Ticket-03)
     expect(last(r.snaps).lanterns[0]).toMatchObject({ lit: false, deposited: 4 });
   });
   it("lights at 10 (+100) and only the missing amount is taken", () => {
@@ -155,7 +163,7 @@ describe("lanterns", () => {
     });
     expect(named(r.events, "lantern_lit")).toHaveLength(1);
     expect(last(r.snaps).player.carried).toBe(7);
-    expect(last(r.snaps).score).toBe(30 + 100);
+    expect(last(r.snaps).score).toBe(3 * 5 + 100); // per_mote 5 (Ticket-03)
   });
   it("needs a rising edge and interact_radius 2.0", () => {
     const far = run({
@@ -177,7 +185,7 @@ describe("lanterns", () => {
     });
     expect(named(held.events, "deposit")).toHaveLength(1);
   });
-  it("picks the nearest unlit lantern, the smaller id on a tie, and skips lit ones", () => {
+  it("picks the nearest receptive lantern and the smaller id on a tie; a lit lantern that has burnt a little accepts motes", () => {
     const tie = run({
       ticks: 2,
       scenario: {
@@ -201,7 +209,13 @@ describe("lanterns", () => {
       },
       frames: [{ tick: 0, interact: true }],
     });
-    expect(named(skip.events, "deposit")[0]!.data.lantern_id).toBe("L2");
+    // Ticket-03: lit lanterns accept motes. Fuel is burnt at step 2, before interaction at step 5,
+    // so even a freshly placed full lantern is 1/60 short and is the nearest receptive one.
+    expect(named(skip.events, "deposit")).toHaveLength(0);
+    expect(named(skip.events, "refuel")[0]).toMatchObject({
+      tick: 1,
+      data: { lantern_id: "L1", amount: 1, fuel: 100 },
+    });
   });
   it("scenario lit:true gives no event and no score", () => {
     const r = run({ ticks: 5, scenario: { lanterns: [{ id: "L2", lit: true }] } });
@@ -227,28 +241,44 @@ describe("win, lose and score", () => {
     lanterns: ["L2", "L3", "L4", "L5"].map((id) => ({ id, lit: true })),
     ...extra,
   });
-  it("win adds floor(seconds left) * 2 + 50 per flame", () => {
+  // Ticket-03 [THAY THẾ]: no early win (all_lit gone), no time bonus; win only at dawn.
+  it("lighting the last lantern no longer ends the night", () => {
     const r = run({
       ticks: 10,
       scenario: lastLit({ time_left_s: 100 }),
       frames: [{ tick: 0, interact: true }],
     });
-    expect(named(r.events, "game_over")[0]!.data).toEqual({ result: "won", reason: "all_lit" });
-    expect(r.end).toEqual({
-      type: "end",
-      ticks: 1,
-      state: "won",
-      score: 100 + 100 + 99 * 2 + 3 * 50,
-    });
+    expect(named(r.events, "lantern_lit")).toHaveLength(1);
+    expect(named(r.events, "game_over")).toHaveLength(0);
+    expect(r.end).toEqual({ type: "end", ticks: 10, state: "playing", score: 50 + 100 });
   });
-  it("lighting the last lantern on the very last tick is still a win", () => {
+  it("dawn win scores 50 + floor(fuel) per lit lantern and 50 per flame, no time bonus", () => {
+    const r = run({
+      ticks: 1000,
+      scenario: {
+        time_left_s: 1,
+        lanterns: ["L1", "L2", "L3", "L4", "L5"].map((id) => ({ id, lit: true })),
+      },
+    });
+    expect(named(r.events, "game_over")[0]!.data).toEqual({
+      result: "won",
+      reason: "dawn_survived",
+    });
+    // 60 ticks of decay: fuel 100 - 1 = 99 exactly on every lantern
+    expect(r.end).toEqual({ type: "end", ticks: 60, state: "won", score: 5 * (50 + 99) + 3 * 50 });
+  });
+  it("lighting the last lantern on the very last tick still counts at dawn", () => {
     const r = run({
       ticks: 10,
       scenario: lastLit({ time_left_s: 1 / 60 }),
       frames: [{ tick: 0, interact: true }],
     });
-    expect(r.end.state).toBe("won");
-    expect(r.end.score).toBe(100 + 100 + 0 + 150);
+    expect(named(r.events, "game_over")[0]!.data).toEqual({
+      result: "won",
+      reason: "dawn_survived",
+    });
+    // 50 (10 motes) + 100 first light; dawn: L1 fuel 100, L2-L5 fuel 99.98 -> 99; + 3 flames
+    expect(r.end.score).toBe(50 + 100 + (50 + 100) + 4 * (50 + 99) + 3 * 50);
   });
   it("no flames always loses, even with every lantern lit", () => {
     const r = run({
@@ -549,7 +579,7 @@ describe("tick model & output format", () => {
     expect(last(r.snaps)).toMatchObject({
       tick: 90,
       sim_tick: 90,
-      time_left_s: 298.5,
+      time_left_s: 238.5,
       night: 1,
       state: "playing",
     });
@@ -565,6 +595,7 @@ describe("tick model & output format", () => {
     expect(s).toMatchObject({ night: 2, wind: { active: false, dir_deg: 0 } });
     expect(Object.keys(s.player).sort()).toEqual(
       [
+        "capacity",
         "carried",
         "charm_s",
         "dash_cd_s",

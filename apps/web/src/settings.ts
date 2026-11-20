@@ -3,10 +3,12 @@ export interface Settings {
   volume: number;
   /** Mouse drag sensitivity multiplier. */
   sensitivity: number;
+  /** "Bảng màu dễ phân biệt": colour-blind-friendly palette. */
+  colorBlind: boolean;
 }
 
 const KEY = "ddl.settings.v2";
-const DEFAULTS: Settings = { volume: 0.7, sensitivity: 1 };
+const DEFAULTS: Settings = { volume: 0.7, sensitivity: 1, colorBlind: false };
 
 const clamp = (v: unknown, lo: number, hi: number, d: number): number =>
   typeof v === "number" && Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : d;
@@ -20,6 +22,7 @@ export function loadSettings(): Settings {
       return {
         volume: clamp(o.volume, 0, 1, DEFAULTS.volume),
         sensitivity: clamp(o.sensitivity, 0.2, 3, DEFAULTS.sensitivity),
+        colorBlind: o.colorBlind === true,
       };
     }
   } catch {

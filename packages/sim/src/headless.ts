@@ -21,7 +21,7 @@ function vec3(v: unknown, what: string): Vec3 {
   return [v[0] as number, v[1] as number, v[2] as number];
 }
 
-const SHADE_STATES: ShadeState[] = ["spawning", "wander", "chase", "recoil", "stunned"];
+const SHADE_STATES: ShadeState[] = ["spawning", "wander", "chase", "recoil", "stunned", "drain"];
 const DRIFTER_STATES: DrifterState[] = ["idle", "chase", "flee", "removed"];
 const BUTTONS = ["jump", "interact", "pulse", "dash", "pause"] as const;
 
@@ -74,6 +74,7 @@ export function parseScenario(raw: unknown): Scenario {
       "dash_cd_ticks",
       "pulse_cd_ticks",
       "charm_ticks",
+      "successful_lights",
     ] as const) {
       if (p[k] !== undefined) {
         if (!isNat(p[k]))
@@ -112,6 +113,11 @@ export function parseScenario(raw: unknown): Scenario {
         if (!isNat(x.state_ticks_left))
           throw new InputError(`${w}.state_ticks_left: expected a non-negative integer`);
         o.state_ticks_left = x.state_ticks_left;
+      }
+      if (x.target_lantern_id !== undefined) {
+        if (x.target_lantern_id !== null && typeof x.target_lantern_id !== "string")
+          throw new InputError(`${w}.target_lantern_id: expected a string or null`);
+        o.target_lantern_id = x.target_lantern_id;
       }
       return o;
     });
@@ -176,6 +182,16 @@ export function parseScenario(raw: unknown): Scenario {
       if (x.lit !== undefined) {
         if (typeof x.lit !== "boolean") throw new InputError(`${w}.lit: expected a boolean`);
         o.lit = x.lit;
+      }
+      if (x.fuel !== undefined) {
+        if (!isNum(x.fuel) || x.fuel < 0 || x.fuel > 100)
+          throw new InputError(`${w}.fuel: expected a number in [0, 100]`);
+        o.fuel = x.fuel;
+      }
+      if (x.ever_lit !== undefined) {
+        if (typeof x.ever_lit !== "boolean")
+          throw new InputError(`${w}.ever_lit: expected a boolean`);
+        o.ever_lit = x.ever_lit;
       }
       if (x.deposited !== undefined) {
         if (!isNum(x.deposited) || x.deposited < 0)

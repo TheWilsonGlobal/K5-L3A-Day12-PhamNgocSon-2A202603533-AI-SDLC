@@ -1,5 +1,6 @@
 import * as THREE from "three";
-import type { Sim, Tuning } from "@ddl/sim";
+import type { Sim, Snapshot, Tuning } from "@ddl/sim";
+import { PAL, css, isColorBlind } from "./palette.ts";
 import type { TerrainImage } from "./world.ts";
 
 export const MINIMAP_SIZE = 180;
@@ -12,10 +13,12 @@ const VIEW_RADIUS_M = 42;
 export function drawMinimap(
   ctx: CanvasRenderingContext2D,
   sim: Sim,
+  snap: Snapshot,
   yaw: number,
   T: Tuning,
   terrain: TerrainImage,
   help: boolean,
+  blinkOn: boolean,
 ): void {
   const S = MINIMAP_SIZE;
   const c = S / 2;
@@ -62,16 +65,16 @@ export function drawMinimap(
   }
   for (const m of sim.motes) {
     const [x, y] = map(m.pos[0], m.pos[2]);
-    ctx.fillStyle = "#1c2440";
+    ctx.fillStyle = css(PAL.mapMoteBack);
     ctx.fillRect(x - 3, y - 3, 6, 6);
-    ctx.fillStyle = "#fff6a0";
+    ctx.fillStyle = css(PAL.mapMote);
     ctx.fillRect(x - 2, y - 2, 4, 4);
   }
   for (const ch of sim.charms) {
     if (!ch.available) continue;
     const [x, y] = map(ch.pos[0], ch.pos[2]);
-    ctx.fillStyle = "#c8102e";
-    ctx.strokeStyle = "#f2c14e";
+    ctx.fillStyle = css(PAL.scarf);
+    ctx.strokeStyle = css(PAL.gold);
     ctx.lineWidth = 1.5;
     ctx.fillRect(x - 3, y - 4, 6, 8);
     ctx.strokeRect(x - 3, y - 4, 6, 8);
@@ -80,37 +83,67 @@ export function drawMinimap(
   ctx.font = "bold 10px system-ui, sans-serif";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  for (const l of sim.lanterns) {
+  for (const l of snap.lanterns) {
     const [x, y] = map(l.pos[0], l.pos[2]);
+    const low = l.lit && l.fuel < T.low_fuel_threshold;
     ctx.beginPath();
     ctx.arc(x, y, 7, 0, Math.PI * 2);
-    ctx.fillStyle = l.lit ? "#ffb347" : "#2a2f4a";
+    ctx.fillStyle = css(l.lit ? PAL.lanternOn : PAL.mapUnlit);
     ctx.fill();
     ctx.lineWidth = 2;
-    ctx.strokeStyle = l.lit ? "#fff3c8" : "#e4e8ff";
+    ctx.strokeStyle = css(
+      low && blinkOn ? PAL.danger : l.lit ? PAL.mapLanternRimOn : PAL.mapLanternRimOff,
+    );
     ctx.stroke();
     if (!l.lit && l.deposited > 0) {
+      const cost = l.ever_lit ? T.relight_cost : T.lantern_cost;
       ctx.beginPath();
-      ctx.arc(x, y, 7, -Math.PI / 2, -Math.PI / 2 + (l.deposited / T.lantern_cost) * Math.PI * 2);
-      ctx.strokeStyle = "#ffb347";
+      ctx.arc(x, y, 7, -Math.PI / 2, -Math.PI / 2 + (l.deposited / cost) * Math.PI * 2);
+      ctx.strokeStyle = css(PAL.lanternOn);
       ctx.stroke();
     }
-    ctx.fillStyle = l.lit ? "#3a2200" : "#d8d8e8";
+    ctx.fillStyle = css(l.lit ? PAL.mapLanternTextOn : PAL.mapLanternTextOff);
     ctx.fillText(l.id.slice(1), x, y + 0.5);
+    if (low && blinkOn && isColorBlind()) {
+      // white warning is not enough on its own: add the glyph above the lantern
+      ctx.font = "bold 13px system-ui, sans-serif";
+      ctx.fillStyle = css(PAL.danger);
+      ctx.fillText("⚠", x, y - 13);
+      ctx.font = "bold 10px system-ui, sans-serif";
+    }
   }
   for (const s of sim.shades) {
     const [x, y] = map(s.pos[0], s.pos[2]);
     ctx.beginPath();
     ctx.arc(x, y, 4.5, 0, Math.PI * 2);
-    ctx.fillStyle = s.state === "stunned" ? "#6a6a98" : "#7a3cff";
+    ctx.fillStyle = css(
+      s.state === "stunned"
+        ? PAL.mapShadeStun
+        : s.state === "drain"
+          ? PAL.shadeDrain
+          : PAL.shadeRim,
+    );
     ctx.fill();
-    ctx.strokeStyle = "#ffffff88";
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.53)";
     ctx.lineWidth = 1;
     ctx.stroke();
+    if (s.state === "drain") {
+      const tl = sim.lanterns.find((l) => l.id === s.target_lantern_id);
+      if (!tl) throw new Error(`shade ${s.id} in drain without a known target lantern`);
+      const [lx, ly] = map(tl.pos[0], tl.pos[2]);
+      ctx.strokeStyle = css(PAL.shadeDrain);
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([3, 3]);
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(lx, ly);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
   }
   for (const d of sim.drifters) {
     const [x, y] = map(d.pos[0], d.pos[2]);
-    ctx.strokeStyle = "#8fa3b8";
+    ctx.strokeStyle = css(PAL.drifter);
     ctx.lineWidth = 2;
     ctx.beginPath();
     ctx.moveTo(x - 5, y + 2);
@@ -119,14 +152,14 @@ export function drawMinimap(
   }
 
   // Mây at the centre
-  ctx.fillStyle = "#ffffff";
+  ctx.fillStyle = css(PAL.mapPlayer);
   ctx.beginPath();
   ctx.moveTo(c, c - 7);
   ctx.lineTo(c + 5, c + 5);
   ctx.lineTo(c - 5, c + 5);
   ctx.closePath();
   ctx.fill();
-  ctx.strokeStyle = "#ffb347";
+  ctx.strokeStyle = css(PAL.lanternOn);
   ctx.lineWidth = 1.5;
   ctx.stroke();
   ctx.restore();
@@ -137,7 +170,7 @@ export function drawMinimap(
   ctx.arc(c, c, c - 2, 0, Math.PI * 2);
   ctx.stroke();
   if (help) {
-    ctx.fillStyle = "#f5f1e6";
+    ctx.fillStyle = css(PAL.text);
     ctx.font = "10px system-ui, sans-serif";
     ctx.textAlign = "center";
     ctx.fillText("↑ hướng camera", c, 12);
@@ -150,6 +183,7 @@ const STATE_VI: Record<string, string> = {
   chase: "đang đuổi",
   recoil: "lùi lại",
   stunned: "bị choáng",
+  drain: "đang hút dầu đèn",
   idle: "lượn chậm",
   flee: "bay trốn",
 };
@@ -168,19 +202,22 @@ export function updateLabels(
   container: HTMLElement,
   pool: Map<string, HTMLDivElement>,
   sim: Sim,
+  snap: Snapshot,
   camera: THREE.Camera,
   T: Tuning,
   help: boolean,
 ): void {
   const specs: LabelSpec[] = [];
   const near = (x: number, z: number, r: number) => Math.hypot(x - sim.pos[0], z - sim.pos[2]) <= r;
-  // Lantern progress badge is always on ("4/10" or "✔"); H expands it to a sentence.
-  for (const l of sim.lanterns) {
+  // Lantern badge is always on ("4/10", or "✔ 72" = lit with 72 fuel); H expands it to a sentence.
+  for (const l of snap.lanterns) {
     const inRange = near(l.pos[0], l.pos[2], T.interact_radius);
-    const short = l.lit ? "✔ sáng" : `${l.deposited}/${T.lantern_cost}`;
+    const cost = l.ever_lit ? T.relight_cost : T.lantern_cost;
+    const fuel = Math.round(l.fuel);
+    const short = l.lit ? `✔ ${fuel}` : `${l.deposited}/${cost}`;
     const full = l.lit
-      ? "đã sáng ✔"
-      : `${l.deposited}/${T.lantern_cost} đom đóm${inRange ? " · nhấn E để nạp" : ""}`;
+      ? `đang sáng · dầu ${fuel}/${T.fuel_max}${inRange && l.fuel < T.fuel_max ? " · nhấn E để châm dầu" : ""}`
+      : `${l.deposited}/${cost} đom đóm${inRange ? " · nhấn E để nạp" : ""}`;
     specs.push({
       id: `l-${l.id}`,
       pos: [l.pos[0], l.pos[1] + 5.6, l.pos[2]],
@@ -192,7 +229,7 @@ export function updateLabels(
     specs.push({
       id: "may",
       pos: [sim.pos[0], sim.pos[1] + 3, sim.pos[2]],
-      text: `Mây (bạn) · mang ${sim.carried}/${T.carry_capacity}`,
+      text: `Mây (bạn) · mang ${snap.player.carried}/${snap.player.capacity}`,
       cls: "may",
     });
     for (const s of sim.shades)

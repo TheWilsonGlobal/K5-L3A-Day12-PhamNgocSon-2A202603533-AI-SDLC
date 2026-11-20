@@ -6,6 +6,9 @@ export interface ScoreTuning {
   per_stun: number;
   per_second_left: number;
   per_flame_left: number;
+  per_relight: number;
+  per_stun_drain: number;
+  per_lit_lantern_dawn: number;
 }
 
 export interface Tuning {
@@ -20,6 +23,14 @@ export interface Tuning {
   night1_duration_s: number;
   night2_duration_s: number;
   night3_duration_s: number;
+  fuel_max: number;
+  fuel_decay_per_s: number;
+  fuel_per_mote: number;
+  relight_cost: number;
+  win_ratio: number;
+  drain_per_s: number;
+  low_fuel_threshold: number;
+  capacity_max: number;
   flames: number;
   invuln_s: number;
   hit_drop_ratio: number;
@@ -57,7 +68,7 @@ export interface InputState {
 
 export type InputFrame = Partial<InputState> & { tick: number };
 
-export type ShadeState = "spawning" | "wander" | "chase" | "recoil" | "stunned";
+export type ShadeState = "spawning" | "wander" | "chase" | "recoil" | "stunned" | "drain";
 export type DrifterState = "idle" | "chase" | "flee" | "removed";
 
 export interface Scenario {
@@ -69,13 +80,20 @@ export interface Scenario {
     dash_cd_ticks?: number;
     pulse_cd_ticks?: number;
     charm_ticks?: number;
+    successful_lights?: number;
   };
   random_motes?: boolean;
   random_shades?: boolean;
   random_drifters?: boolean;
   wind_enabled?: boolean;
   motes?: Vec3[];
-  shades?: { id?: string; pos?: Vec3; state?: ShadeState; state_ticks_left?: number }[];
+  shades?: {
+    id?: string;
+    pos?: Vec3;
+    state?: ShadeState;
+    state_ticks_left?: number;
+    target_lantern_id?: string | null;
+  }[];
   drifters?: {
     id?: string;
     pos?: Vec3;
@@ -84,11 +102,20 @@ export interface Scenario {
     state_ticks_left?: number;
   }[];
   charms?: { id?: string; pos?: Vec3; available?: boolean; respawn_ticks?: number }[];
-  lanterns?: { id: string; pos?: Vec3; lit?: boolean; deposited?: number }[];
+  lanterns?: {
+    id: string;
+    pos?: Vec3;
+    lit?: boolean;
+    fuel?: number;
+    ever_lit?: boolean;
+    deposited?: number;
+  }[];
   time_left_s?: number;
 }
 
 export type GameState = "playing" | "paused" | "won" | "lost";
+
+export type GameOverReason = "dawn_survived" | "dawn" | "no_flames";
 
 export type EventName =
   | "mote_picked"
@@ -104,7 +131,10 @@ export type EventName =
   | "drifter_drop"
   | "night_start"
   | "paused"
-  | "resumed";
+  | "resumed"
+  | "refuel"
+  | "lantern_out"
+  | "fuel_drain";
 
 export interface SimEvent {
   type: "event";
@@ -132,8 +162,17 @@ export interface Snapshot {
     dash_cd_s: number;
     pulse_cd_s: number;
     charm_s: number;
+    capacity: number;
   };
-  lanterns: { id: string; pos: Vec3; lit: boolean; deposited: number }[];
+  lanterns: {
+    id: string;
+    pos: Vec3;
+    lit: boolean;
+    deposited: number;
+    fuel: number;
+    ever_lit: boolean;
+    relit_count: number;
+  }[];
   shades: { id: string; pos: Vec3; state: ShadeState }[];
   motes_active: number;
   motes: { id: string; pos: Vec3; kind: "random" | "dropped"; ttl_s: number | null }[];
