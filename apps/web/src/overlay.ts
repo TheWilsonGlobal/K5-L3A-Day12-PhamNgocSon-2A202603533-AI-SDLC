@@ -326,3 +326,38 @@ export function updateArrow(el: HTMLElement, sim: Sim, camera: THREE.Camera): vo
   const lab = el.querySelector<HTMLElement>(".dist");
   if (lab) lab.textContent = `${best.id} · ${Math.round(bestD)} m`;
 }
+
+/** Screen-edge directional indicator pointing toward a newly spawned Bóng Mực (TICKET-04 §4). */
+export function updateShadeArrow(
+  el: HTMLElement,
+  sim: Sim,
+  camera: THREE.Camera,
+  shadeId: string | null,
+): void {
+  const shade = shadeId ? sim.shades.find((s) => s.id === shadeId) : undefined;
+  if (!shade || sim.outcome) {
+    el.style.display = "none";
+    return;
+  }
+  const d = Math.hypot(
+    shade.pos[0] - sim.pos[0],
+    shade.pos[1] - sim.pos[1],
+    shade.pos[2] - sim.pos[2],
+  );
+  v.set(shade.pos[0], shade.pos[1] + 1.2, shade.pos[2]).project(camera);
+  const behind = v.z > 1;
+  let nx = behind ? -v.x : v.x;
+  let ny = behind ? -v.y : v.y;
+  const m = Math.max(Math.abs(nx) / 0.88, Math.abs(ny) / 0.8, 1e-6);
+  nx /= m;
+  ny /= m;
+  const w = window.innerWidth;
+  const h = window.innerHeight;
+  el.style.display = "flex";
+  el.style.transform = `translate(${((nx * 0.88 + 1) / 2) * w}px, ${((1 - ny * 0.8) / 2) * h}px) translate(-50%, -50%)`;
+  const ang = Math.atan2(nx * w, ny * h);
+  const tip = el.querySelector<HTMLElement>(".tip");
+  if (tip) tip.style.transform = `rotate(${ang}rad)`;
+  const lab = el.querySelector<HTMLElement>(".dist");
+  if (lab) lab.textContent = `⚠ ${shade.id} · ${Math.round(d)} m`;
+}

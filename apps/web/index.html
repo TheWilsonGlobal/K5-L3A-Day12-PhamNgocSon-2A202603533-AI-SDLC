@@ -13,6 +13,16 @@
         --gold: #f2c14e;
         --text: #f5f1e6;
         --lamp: #ffb347;
+        --ui-scale: 1;
+      }
+      html.large-text {
+        --ui-scale: 1.25;
+      }
+      html.reduce-motion *,
+      html.reduce-motion *::before,
+      html.reduce-motion *::after {
+        animation: none !important;
+        transition: none !important;
       }
       html,
       body {
@@ -21,6 +31,7 @@
         overflow: hidden;
         background: var(--sky);
         font-family: system-ui, "Segoe UI", sans-serif;
+        font-size: calc(18px * var(--ui-scale));
         color: var(--text);
       }
       canvas {
@@ -34,7 +45,7 @@
         border-radius: 4px;
         background: #1b2350;
         font-family: inherit;
-        font-size: 0.88em;
+        font-size: calc(18px * var(--ui-scale));
         color: var(--text);
       }
       .ic {
@@ -48,8 +59,8 @@
         fill: currentColor;
       }
       .lab {
-        font-size: 10.5px;
-        letter-spacing: 0.09em;
+        font-size: calc(18px * var(--ui-scale));
+        letter-spacing: 0.06em;
         text-transform: uppercase;
         color: #aeb6dc;
       }
@@ -112,7 +123,7 @@
         gap: 8px;
       }
       .lamps b {
-        font-size: 17px;
+        font-size: calc(18px * var(--ui-scale));
         font-variant-numeric: tabular-nums;
       }
       .score {
@@ -120,7 +131,7 @@
       }
       .score b {
         display: inline-block;
-        font-size: 22px;
+        font-size: calc(22px * var(--ui-scale));
         font-variant-numeric: tabular-nums;
         color: var(--gold);
       }
@@ -194,8 +205,8 @@
         flex-direction: column;
         align-items: center;
         gap: 2px;
-        min-width: 70px;
-        font-size: 11px;
+        min-width: 78px;
+        font-size: calc(18px * var(--ui-scale));
         --col: #aeb6dc;
         color: #aeb6dc;
       }
@@ -260,11 +271,38 @@
         position: absolute;
         left: 14px;
         bottom: 18px;
-        font-size: 11.5px;
+        font-size: calc(18px * var(--ui-scale));
         color: #aeb6dc;
         background: rgba(14, 20, 48, 0.6);
         padding: 4px 10px;
         border-radius: 10px;
+      }
+      #subtitles {
+        position: fixed;
+        left: 50%;
+        bottom: 148px;
+        transform: translateX(-50%);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 6px;
+        pointer-events: none;
+        z-index: 15;
+      }
+      #subtitles .sub-item {
+        padding: 6px 16px;
+        border-radius: 999px;
+        background: rgba(14, 20, 48, 0.92);
+        border: 1.5px solid var(--gold);
+        color: var(--text);
+        font-size: calc(18px * var(--ui-scale));
+        font-weight: 600;
+        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+        white-space: nowrap;
+      }
+      #subtitles .sub-item.danger {
+        border-color: var(--danger);
+        color: var(--danger);
       }
       #prompt {
         position: fixed;
@@ -276,7 +314,7 @@
         background: rgba(27, 35, 80, 0.9);
         border: 1px solid rgba(255, 179, 71, 0.75);
         box-shadow: 0 0 18px rgba(255, 179, 71, 0.35);
-        font-size: 15px;
+        font-size: calc(18px * var(--ui-scale));
         opacity: 0;
         pointer-events: none;
         transition:
@@ -292,7 +330,8 @@
         box-shadow: none;
         color: #cfd3ea;
       }
-      #arrow {
+      #arrow,
+      #shadeArrow {
         position: fixed;
         left: 0;
         top: 0;
@@ -303,18 +342,26 @@
         pointer-events: none;
         filter: drop-shadow(0 0 6px rgba(255, 179, 71, 0.8));
       }
-      #arrow .tip {
+      #shadeArrow {
+        filter: drop-shadow(0 0 8px var(--shade-rim));
+      }
+      #arrow .tip,
+      #shadeArrow .tip {
         width: 0;
         height: 0;
         border-left: 13px solid transparent;
         border-right: 13px solid transparent;
         border-bottom: 26px solid var(--lamp);
       }
-      #arrow .dist {
-        font-size: 11px;
-        padding: 1px 7px;
+      #shadeArrow .tip {
+        border-bottom-color: var(--shade-rim);
+      }
+      #arrow .dist,
+      #shadeArrow .dist {
+        font-size: calc(18px * var(--ui-scale));
+        padding: 2px 8px;
         border-radius: 8px;
-        background: rgba(14, 20, 48, 0.85);
+        background: rgba(14, 20, 48, 0.9);
         color: var(--text);
       }
       #minimap {
@@ -337,7 +384,7 @@
         left: 0;
         top: 0;
         padding: 2px 7px;
-        font-size: 12px;
+        font-size: calc(18px * var(--ui-scale));
         white-space: nowrap;
         border-radius: 6px;
         background: rgba(14, 20, 48, 0.88);
@@ -366,7 +413,7 @@
       .lbl.mote {
         border-color: rgba(255, 229, 138, 0.4);
         color: #ffe58a;
-        font-size: 10px;
+        font-size: calc(18px * var(--ui-scale));
         padding: 0 4px;
       }
 
@@ -414,7 +461,7 @@
       .kicker {
         text-transform: uppercase;
         letter-spacing: 0.14em;
-        font-size: 12px;
+        font-size: calc(18px * var(--ui-scale));
       }
       blockquote {
         margin: 12px 0 2px;
@@ -444,7 +491,7 @@
       button {
         font: inherit;
         padding: 10px 22px;
-        font-size: 16px;
+        font-size: calc(18px * var(--ui-scale));
         color: #2a1600;
         background: linear-gradient(180deg, #ffd27a, #ffb347);
         border: 0;
@@ -510,11 +557,11 @@
       }
       .guide {
         text-align: left;
-        font-size: 14.5px;
+        font-size: calc(18px * var(--ui-scale));
       }
       .guide h3 {
         margin: 14px 0 4px;
-        font-size: 15px;
+        font-size: calc(19px * var(--ui-scale));
         color: #ffb347;
       }
       .guide ul {
@@ -528,13 +575,91 @@
         border-radius: 50%;
         margin-right: 6px;
       }
+      .lb-form {
+        margin: 12px 0;
+        padding: 12px;
+        border-radius: 12px;
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(242, 193, 78, 0.35);
+      }
+      .lb-form-row {
+        display: flex;
+        gap: 8px;
+        justify-content: center;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+      .lb-input {
+        font: inherit;
+        font-size: calc(18px * var(--ui-scale));
+        padding: 8px 12px;
+        border-radius: 8px;
+        border: 1px solid rgba(242, 193, 78, 0.6);
+        background: #0e1430;
+        color: var(--text);
+        width: 180px;
+      }
+      .lb-msg {
+        margin-top: 6px;
+        font-size: calc(18px * var(--ui-scale));
+        color: var(--gold);
+      }
+      .lb-msg.err {
+        color: var(--danger);
+      }
+      .lb-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 12px 0;
+        font-size: calc(18px * var(--ui-scale));
+        text-align: left;
+      }
+      .lb-table th,
+      .lb-table td {
+        padding: 6px 8px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+      }
+      .lb-table th {
+        color: var(--gold);
+      }
+      .kb-grid {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 8px 12px;
+        align-items: center;
+        text-align: left;
+        margin: 10px 0;
+      }
+      .kb-btn {
+        min-width: 110px;
+        padding: 6px 14px;
+        font-size: calc(18px * var(--ui-scale));
+      }
+      .kb-btn.conflict {
+        border-color: var(--danger);
+        color: var(--danger);
+      }
+      .kb-conflict {
+        margin: 8px 0;
+        padding: 8px 12px;
+        border-radius: 8px;
+        border: 1.5px solid var(--danger);
+        color: var(--danger);
+        font-size: calc(18px * var(--ui-scale));
+        font-weight: 600;
+      }
     </style>
   </head>
   <body>
     <div id="labels"></div>
     <div id="hud"></div>
+    <div id="subtitles" aria-live="polite"></div>
     <div id="prompt"></div>
     <div id="arrow">
+      <div class="tip"></div>
+      <div class="dist"></div>
+    </div>
+    <div id="shadeArrow">
       <div class="tip"></div>
       <div class="dist"></div>
     </div>
@@ -553,10 +678,33 @@
             <button class="ghost" data-night="3">Đêm 3 · Đảo Chuông</button>
           </div>
           <div class="btns row">
+            <button class="ghost" id="btnLeaderboardMenu">Bảng xếp hạng</button>
             <button class="ghost" id="btnGuideMenu">Hướng dẫn</button>
             <button class="ghost" id="btnSettingsMenu">Cài đặt</button>
           </div>
         </div>
+      </div>
+    </div>
+
+    <!-- leaderboard -->
+    <div id="leaderboard" class="screen">
+      <div class="card" style="width: min(680px, calc(100vw - 32px))">
+        <h2>Bảng xếp hạng</h2>
+        <div class="sub">Top 10 người giữ đèn xuất sắc nhất</div>
+        <table class="lb-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Tên</th>
+              <th>Điểm</th>
+              <th>Đêm thắng</th>
+              <th>Seed</th>
+            </tr>
+          </thead>
+          <tbody id="lbTableBody"></tbody>
+        </table>
+        <div id="lbEmpty" class="sub">Chưa có kỷ lục nào được lưu.</div>
+        <button id="btnLeaderboardBack">Đóng</button>
       </div>
     </div>
 
@@ -578,6 +726,20 @@
         <div class="kicker" id="resKicker"></div>
         <h2 id="resTitle"></h2>
         <div class="stats" id="resStats"></div>
+        <div id="resSaveBox" class="lb-form" style="display: none">
+          <div class="lb-form-row">
+            <label for="resNameInput">Lưu bảng xếp hạng:</label>
+            <input
+              id="resNameInput"
+              class="lb-input"
+              type="text"
+              maxlength="12"
+              placeholder="Tên (3-12 ký tự)"
+            />
+            <button id="btnResSaveScore" type="button">Lưu điểm</button>
+          </div>
+          <div id="resSaveMsg" class="lb-msg"></div>
+        </div>
         <div class="btns row">
           <button id="btnNext">Đêm kế tiếp (Enter)</button>
           <button id="btnRetry">Chơi lại Đêm (Enter)</button>
@@ -595,6 +757,20 @@
         <div class="big" id="dawnScore">0</div>
         <div class="kicker">tổng điểm</div>
         <div class="stats" id="dawnStats"></div>
+        <div id="dawnSaveBox" class="lb-form">
+          <div class="lb-form-row">
+            <label for="dawnNameInput">Lưu bảng xếp hạng:</label>
+            <input
+              id="dawnNameInput"
+              class="lb-input"
+              type="text"
+              maxlength="12"
+              placeholder="Tên (3-12 ký tự)"
+            />
+            <button id="btnDawnSaveScore" type="button">Lưu điểm</button>
+          </div>
+          <div id="dawnSaveMsg" class="lb-msg"></div>
+        </div>
         <div class="btns row">
           <button id="btnDawnAgain">Chơi lại từ Đêm 1</button>
           <button class="ghost" id="btnDawnMenu">Về menu</button>
@@ -619,7 +795,7 @@
 
     <!-- settings -->
     <div id="settings" class="screen">
-      <div class="card">
+      <div class="card" style="width: min(620px, calc(100vw - 32px))">
         <h2>Cài đặt</h2>
         <div class="field">
           <label for="optVolume">Âm lượng</label>
@@ -635,8 +811,21 @@
           <input id="optColorBlind" type="checkbox" />
           <label for="optColorBlind">Bảng màu dễ phân biệt</label>
         </div>
-        <div class="sub">Tự động lưu cho các lần mở sau.</div>
-        <button id="btnSettingsBack">Quay lại</button>
+        <div class="field check">
+          <input id="optReduceMotion" type="checkbox" />
+          <label for="optReduceMotion">Giảm chuyển động (tắt rung & chớp màn hình)</label>
+        </div>
+        <div class="field check">
+          <input id="optLargeText" type="checkbox" />
+          <label for="optLargeText">Chữ lớn (×1.25)</label>
+        </div>
+        <h3 style="margin: 14px 0 6px; color: var(--gold)">Đổi phím điều khiển</h3>
+        <div id="keybindList" class="kb-grid"></div>
+        <div id="keyConflictMsg" class="kb-conflict" role="alert" hidden></div>
+        <div class="btns row">
+          <button class="ghost" id="btnResetKeys" type="button">Khôi phục mặc định</button>
+          <button id="btnSettingsBack" type="button">Quay lại</button>
+        </div>
       </div>
     </div>
 

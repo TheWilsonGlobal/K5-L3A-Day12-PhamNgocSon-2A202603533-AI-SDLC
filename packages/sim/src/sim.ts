@@ -177,6 +177,57 @@ export class Sim {
   charms: Charm[] = [];
   wind = { active: false, dir_deg: 0 };
   windWarning = false;
+  benchMode = false;
+
+  /**
+   * TICKET-04 §1 standard benchmark scene:
+   * - Night 1, Mây at (0,0,0), no player input.
+   * - 200 Shades in `wander` distributed evenly across the island (seed), 100 motes, L1–L3 lit with fuel = 100.
+   * - Disabled in bench: entity spawning, damage, mote pickup, fuel decay, and game_over.
+   */
+  static createBench(tuning: Tuning, seed: number): Sim {
+    const sim = new Sim(
+      tuning,
+      seed,
+      {
+        random_motes: false,
+        random_shades: false,
+        random_drifters: false,
+        wind_enabled: false,
+        lanterns: [
+          { id: "L1", lit: true, fuel: 100, ever_lit: true },
+          { id: "L2", lit: true, fuel: 100, ever_lit: true },
+          { id: "L3", lit: true, fuel: 100, ever_lit: true },
+        ],
+      },
+      1,
+    );
+    sim.benchMode = true;
+    const rng = makeRng(seed ^ 0x42454e43);
+    const maxR = 37;
+    for (let i = 0; i < 100; i++) {
+      const r = maxR * Math.sqrt(rng());
+      const a = rng() * 2 * Math.PI;
+      const x = r * Math.cos(a);
+      const z = r * Math.sin(a);
+      sim.addMote([x, sim.groundOf(x, z), z], "random", null);
+    }
+    for (let i = 0; i < 200; i++) {
+      let x = 0;
+      let z = 0;
+      for (let tries = 0; tries < 32; tries++) {
+        const r = maxR * Math.sqrt(rng());
+        const a = rng() * 2 * Math.PI;
+        x = r * Math.cos(a);
+        z = r * Math.sin(a);
+        if (!sim.nearSafeZone(x, z)) break;
+      }
+      const sh = sim.addShade([x, sim.groundOf(x, z), z], undefined, "wander");
+      sh.heading = rng() * 2 * Math.PI;
+      sh.headLeft = 1 + Math.floor(rng() * 120);
+    }
+    return sim;
+  }
 
   private rng: () => number;
   private seed: number;
@@ -542,40 +593,42 @@ export class Sim {
     this.drifters = this.drifters.filter((d) => d.state !== "removed");
 
     // 2a. fuel: every lit lantern burns decay, plus drain for each shade draining it (G10: state after last step 8)
-    const decay = Math.round((T.fuel_decay_per_s * FUEL_UNITS) / TICK_RATE);
-    const drainPerTick = Math.round((T.drain_per_s * FUEL_UNITS) / TICK_RATE);
-    const drainers = this.shades
-      .filter((s) => {
+    if (!this.benchMode) {
+      const decay = Math.round((T.fuel_decay_per_s * FUEL_UNITS) / TICK_RATE);
+      const drainPerTick = Math.round((T.drain_per_s * FUEL_UNITS) / TICK_RATE);
+      const drainers = this.shades
+        .filter((s) => {
+          const l = this.lanternById(s.target_lantern_id);
+          return s.state === "drain" && l !== undefined && l.lit;
+        })
+        .sort(byId);
+      for (const l of this.lanterns) {
+        if (!l.lit) continue;
+        const n = drainers.filter((s) => s.target_lantern_id === l.id).length;
+        l.fuel = Math.max(0, l.fuel - decay - n * drainPerTick);
+      }
+      for (const s of drainers) {
+        s.drain_ticks += 1;
         const l = this.lanternById(s.target_lantern_id);
-        return s.state === "drain" && l !== undefined && l.lit;
-      })
-      .sort(byId);
-    for (const l of this.lanterns) {
-      if (!l.lit) continue;
-      const n = drainers.filter((s) => s.target_lantern_id === l.id).length;
-      l.fuel = Math.max(0, l.fuel - decay - n * drainPerTick);
-    }
-    for (const s of drainers) {
-      s.drain_ticks += 1;
-      const l = this.lanternById(s.target_lantern_id);
-      if (l && s.drain_ticks % FUEL_DRAIN_EVENT_TICKS === 0)
-        emit("fuel_drain", { lantern_id: l.id, shade_id: s.id, fuel: fuelOut(l.fuel) });
-    }
+        if (l && s.drain_ticks % FUEL_DRAIN_EVENT_TICKS === 0)
+          emit("fuel_drain", { lantern_id: l.id, shade_id: s.id, fuel: fuelOut(l.fuel) });
+      }
 
-    // 2b. lanterns that ran out of fuel go dark (ascending id, G13)
-    for (const l of this.lanterns) {
-      if (!l.lit || l.fuel > 0) continue;
-      l.lit = false;
-      l.fuel = 0;
-      l.deposited = 0;
-      l.ever_lit = true;
-      emit("lantern_out", { lantern_id: l.id });
+      // 2b. lanterns that ran out of fuel go dark (ascending id, G13)
+      for (const l of this.lanterns) {
+        if (!l.lit || l.fuel > 0) continue;
+        l.lit = false;
+        l.fuel = 0;
+        l.deposited = 0;
+        l.ever_lit = true;
+        emit("lantern_out", { lantern_id: l.id });
+      }
     }
 
     // 3. move Mây, then check falling
-    this.movePlayer(input, edge, emit);
+    if (!this.benchMode) this.movePlayer(input, edge, emit);
 
-    const alive = this.respawnWait === 0;
+    const alive = this.respawnWait === 0 && !this.benchMode;
     // 4. pick up fireflies and charms
     if (alive) {
       for (const m of [...this.motes]) {
@@ -770,19 +823,21 @@ export class Sim {
     }
 
     // 10. scheduled spawns (new entities interact from the next tick)
-    this.spawnScheduled(emit);
+    if (!this.benchMode) {
+      this.spawnScheduled(emit);
 
-    // 11. win / lose: no flames first (even on the dawn tick); otherwise only the dawn tick decides
-    if (this.flames <= 0) this.finish("lost", "no_flames", emit);
-    else if (this.timeLeftTicks <= 0) {
-      const lit = this.lanterns.filter((l) => l.lit);
-      const need = Math.ceil(T.win_ratio * this.lanterns.length - 1e-9);
-      if (lit.length >= need) {
-        for (const l of lit)
-          this.score += T.score.per_lit_lantern_dawn + Math.floor(l.fuel / FUEL_UNITS);
-        this.score += this.flames * T.score.per_flame_left;
-        this.finish("won", "dawn_survived", emit);
-      } else this.finish("lost", "dawn", emit);
+      // 11. win / lose: no flames first (even on the dawn tick); otherwise only the dawn tick decides
+      if (this.flames <= 0) this.finish("lost", "no_flames", emit);
+      else if (this.timeLeftTicks <= 0) {
+        const lit = this.lanterns.filter((l) => l.lit);
+        const need = Math.ceil(T.win_ratio * this.lanterns.length - 1e-9);
+        if (lit.length >= need) {
+          for (const l of lit)
+            this.score += T.score.per_lit_lantern_dawn + Math.floor(l.fuel / FUEL_UNITS);
+          this.score += this.flames * T.score.per_flame_left;
+          this.finish("won", "dawn_survived", emit);
+        } else this.finish("lost", "dawn", emit);
+      }
     }
     return ev;
   }
@@ -947,11 +1002,13 @@ export class Sim {
           s.drain_ticks = 0;
         }
       }
-      if (s.state === "wander" && d <= SHADE_DETECT) {
-        // G3: detection at 12 m still wins over the lantern seek; chase shades never retarget
-        s.state = "chase";
-        s.target_lantern_id = null;
-      } else if (s.state === "chase" && d > SHADE_GIVE_UP) s.state = "wander";
+      if (!this.benchMode) {
+        if (s.state === "wander" && d <= SHADE_DETECT) {
+          // G3: detection at 12 m still wins over the lantern seek; chase shades never retarget
+          s.state = "chase";
+          s.target_lantern_id = null;
+        } else if (s.state === "chase" && d > SHADE_GIVE_UP) s.state = "wander";
+      }
       if (s.state === "chase") {
         if (d > 1e-9) {
           const step = Math.min(this.map.shadeSpeed * DT, d);

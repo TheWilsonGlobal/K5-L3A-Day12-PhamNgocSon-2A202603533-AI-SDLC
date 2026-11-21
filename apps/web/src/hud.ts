@@ -1,4 +1,5 @@
 import type { Sim, Snapshot, Tuning } from "@ddl/sim";
+import { formatKeyCode, type Settings } from "./settings.ts";
 
 const idNum = (id: string): number => Number(id.slice(1));
 
@@ -18,7 +19,7 @@ const ICON = {
 };
 
 export interface Hud {
-  update(sim: Sim, snap: Snapshot, helpLabels: boolean): void;
+  update(sim: Sim, snap: Snapshot, helpLabels: boolean, settings?: Settings): void;
   reset(): void;
 }
 
@@ -44,10 +45,10 @@ export function createHud(root: HTMLElement, promptEl: HTMLElement, T: Tuning): 
     <div class="z bc"><div class="fbar" data-r="cells">${cells}</div><div class="fcount"><span class="lab">Đom đóm</span> <b data-r="carryN"></b></div></div>
     <div class="z br">
       <div class="cd" data-r="charmBox"><div class="ring"><i class="ic">${ICON.charm}</i></div><span class="nm">Bùa Gió</span><span class="st" data-r="charmSt"></span></div>
-      <div class="cd" data-r="dashBox"><div class="ring"><i class="ic">${ICON.dash}</i></div><span class="nm">Lướt <kbd>Shift</kbd></span><span class="st" data-r="dashSt"></span></div>
-      <div class="cd" data-r="pulseBox"><div class="ring"><i class="ic">${ICON.pulse}</i></div><span class="nm">Tỏa Sáng <kbd>F</kbd></span><span class="st" data-r="pulseSt"></span></div>
+      <div class="cd" data-r="dashBox"><div class="ring"><i class="ic">${ICON.dash}</i></div><span class="nm">Lướt <kbd data-r="kDash">Shift</kbd></span><span class="st" data-r="dashSt"></span></div>
+      <div class="cd" data-r="pulseBox"><div class="ring"><i class="ic">${ICON.pulse}</i></div><span class="nm">Tỏa Sáng <kbd data-r="kPulse">F</kbd></span><span class="st" data-r="pulseSt"></span></div>
     </div>
-    <div class="keys"><kbd>Esc</kbd>/<kbd>P</kbd> Tạm dừng · <kbd>H</kbd> Nhãn<span data-r="hOn"></span></div>`;
+    <div class="keys"><kbd>Esc</kbd>/<kbd data-r="kPause">P</kbd> Tạm dừng · <kbd>H</kbd> Nhãn<span data-r="hOn"></span></div>`;
 
   const q = <E extends HTMLElement>(k: string) => root.querySelector<E>(`[data-r="${k}"]`)!;
   const flameEls = Array.from(q("flames").children) as HTMLElement[];
@@ -65,6 +66,9 @@ export function createHud(root: HTMLElement, promptEl: HTMLElement, T: Tuning): 
     pulseBox: q("pulseBox"),
     pulseSt: q("pulseSt"),
     hOn: q("hOn"),
+    kDash: q("kDash"),
+    kPulse: q("kPulse"),
+    kPause: q("kPause"),
   };
 
   const cache = new Map<string, string>();
@@ -96,7 +100,13 @@ export function createHud(root: HTMLElement, promptEl: HTMLElement, T: Tuning): 
       cache.clear();
       lastScore = 0;
     },
-    update(sim, snap, helpLabels) {
+    update(sim, snap, helpLabels, settings) {
+      if (settings) {
+        setText("kDash", el.kDash, formatKeyCode(settings.keys.dash));
+        setText("kPulse", el.kPulse, formatKeyCode(settings.keys.pulse));
+        setText("kPause", el.kPause, formatKeyCode(settings.keys.pause));
+      }
+      const interactKey = settings ? formatKeyCode(settings.keys.interact) : "E";
       const cap = snap.player.capacity;
       flameEls.forEach((f, i) => setCls(`f${i}`, f, "off", i >= sim.flames));
       cellEls.forEach((c, i) => {
@@ -170,7 +180,7 @@ export function createHud(root: HTMLElement, promptEl: HTMLElement, T: Tuning): 
         const progress = near.lit ? "" : ` (${near.deposited}/${cost})`;
         const msg =
           snap.player.carried > 0
-            ? `<kbd>E</kbd> — ${near.lit ? "Châm dầu" : "Nạp ánh sáng"}${progress}`
+            ? `<kbd>${interactKey}</kbd> — ${near.lit ? "Châm dầu" : "Nạp ánh sáng"}${progress}`
             : `Đèn ${near.id}${progress} cần đom đóm — hãy đi nhặt thêm`;
         if (cache.get("prompt") !== msg) {
           cache.set("prompt", msg);

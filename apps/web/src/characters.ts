@@ -265,14 +265,68 @@ onPaletteChange(() => {
   WISP_EMIT_STUN.set(PAL.shadeWispEmitStun);
 });
 
+const SHADE_CORE_GEO = new THREE.SphereGeometry(0.72, 16, 12);
+const SHADE_HALO_GEO = new THREE.SphereGeometry(0.72 * 1.2, 16, 12);
+const SHADE_GROUND_GEO = new THREE.CircleGeometry(1.5, 20);
+const SHADE_EYE_GEO = new THREE.SphereGeometry(0.12, 10, 8);
+const SHADE_PUPIL_GEO = new THREE.SphereGeometry(0.055, 8, 6);
+const SHADE_BEAD_GEO = new THREE.SphereGeometry(0.12, 8, 6);
+const SHADE_STAR_GEO = new THREE.OctahedronGeometry(0.1);
+
+const SHARED_BENCH_INK = new THREE.MeshStandardMaterial({
+  color: PAL.shadeBody,
+  emissive: 0x24104a,
+  roughness: 0.6,
+  metalness: 0.4,
+});
+const SHARED_BENCH_HALO = new THREE.MeshBasicMaterial({
+  color: PAL.shadeRim,
+  transparent: true,
+  opacity: 0.55,
+  side: THREE.BackSide,
+  blending: THREE.AdditiveBlending,
+  depthWrite: false,
+});
+const SHARED_BENCH_EYE = new THREE.MeshBasicMaterial({ color: PAL.shadeEye });
+const SHARED_PUPIL_MAT = new THREE.MeshBasicMaterial({ color: 0x1a0b33 });
+
 /** Bóng Mực: friendly-spooky ink spirit — dark core, violet rim halo, drifting droplets, glowing eyes. */
-export function createShade(seed: number): ShadeRig {
+export function createShade(seed: number, bench = false): ShadeRig {
   const group = new THREE.Group();
   const inner = new THREE.Group(); // wobbles and faces the player
   group.add(inner);
 
+  if (bench) {
+    // TICKET-04: in benchmark scene, extra creative decorative sub-meshes are disabled so all 200 wandering shades render on a standard baseline
+    const core = new THREE.Mesh(SHADE_CORE_GEO, SHARED_BENCH_INK);
+    core.scale.set(1, 1.15, 1);
+    core.position.y = 1.05;
+    const halo = new THREE.Mesh(SHADE_HALO_GEO, SHARED_BENCH_HALO);
+    halo.scale.set(1, 1.15, 1);
+    halo.position.y = 1.05;
+    const eyes = new THREE.Group();
+    eyes.position.set(0, 1.18, 0.6);
+    for (const sx of [-1, 1]) {
+      const w = new THREE.Mesh(SHADE_EYE_GEO, SHARED_BENCH_EYE);
+      w.position.x = sx * 0.25;
+      w.scale.set(1, 1.3, 0.6);
+      eyes.add(w);
+    }
+    inner.add(core, halo, eyes);
+    const base = seed * 1.7;
+    return {
+      group,
+      update(t, _dtRaw, _stunned, x, z, tx, tz) {
+        group.position.x = x;
+        group.position.z = z;
+        inner.rotation.y = Math.atan2(tx - x, tz - z);
+        inner.position.y = Math.sin((t + base) * 2.2) * 0.1;
+      },
+    };
+  }
+
   const ink = std(PAL.shadeBody, 0x24104a, 0.6, 0.4);
-  const core = sphere(0.72, ink, 20, 14);
+  const core = new THREE.Mesh(SHADE_CORE_GEO, ink);
   core.scale.set(1, 1.15, 1);
   core.position.y = 1.05;
 
@@ -285,7 +339,7 @@ export function createShade(seed: number): ShadeRig {
     blending: THREE.AdditiveBlending,
     depthWrite: false,
   });
-  const halo = sphere(0.72 * 1.2, haloMat, 20, 14);
+  const halo = new THREE.Mesh(SHADE_HALO_GEO, haloMat);
   halo.scale.set(1, 1.15, 1);
   halo.position.y = 1.05;
 
@@ -297,7 +351,7 @@ export function createShade(seed: number): ShadeRig {
     blending: THREE.AdditiveBlending,
     depthWrite: false,
   });
-  const ground = new THREE.Mesh(new THREE.CircleGeometry(1.5, 28), groundMat);
+  const ground = new THREE.Mesh(SHADE_GROUND_GEO, groundMat);
   ground.rotation.x = -Math.PI / 2;
   ground.position.y = 0.05;
 
@@ -327,13 +381,12 @@ export function createShade(seed: number): ShadeRig {
   const eyes = new THREE.Group();
   eyes.position.set(0, 1.18, 0.6);
   const eyeMat = new THREE.MeshBasicMaterial({ color: EYE_CHASE.clone() });
-  const pupilMat = basic(0x1a0b33);
   const mkEye = (sx: number) => {
     const g = new THREE.Group();
     g.position.x = sx * 0.25;
-    const w = sphere(0.12, eyeMat, 12, 10);
+    const w = new THREE.Mesh(SHADE_EYE_GEO, eyeMat);
     w.scale.set(1, 1.3, 0.6);
-    const p = sphere(0.055, pupilMat, 8, 6);
+    const p = new THREE.Mesh(SHADE_PUPIL_GEO, SHARED_PUPIL_MAT);
     p.position.set(0, 0, 0.06);
     g.add(w, p);
     return { g, p };
@@ -345,7 +398,7 @@ export function createShade(seed: number): ShadeRig {
   // dizzy sparkles, only visible when stunned
   const starMat = basic(0xbfe0ff);
   const stars = [0, 1, 2].map((i) => {
-    const m = new THREE.Mesh(new THREE.OctahedronGeometry(0.1), starMat);
+    const m = new THREE.Mesh(SHADE_STAR_GEO, starMat);
     m.visible = false;
     inner.add(m);
     return { m, ph: (i / 3) * Math.PI * 2 };
@@ -362,9 +415,8 @@ export function createShade(seed: number): ShadeRig {
     blending: THREE.AdditiveBlending,
     depthWrite: false,
   });
-  const beadGeo = new THREE.SphereGeometry(0.12, 8, 6);
   const beads = Array.from({ length: DRAIN_BEADS }, () => {
-    const m = new THREE.Mesh(beadGeo, streamMat);
+    const m = new THREE.Mesh(SHADE_BEAD_GEO, streamMat);
     m.visible = false;
     group.add(m);
     return m;

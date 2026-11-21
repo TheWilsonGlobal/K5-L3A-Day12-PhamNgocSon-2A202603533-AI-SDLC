@@ -53,7 +53,21 @@ export interface Contract {
   build_cmd: string;
   run_cmd: string;
   headless_cmd: string;
+  bench_cmd: string;
+  soak_cmd: string;
   tuning: Tuning;
+}
+
+export interface LeaderboardEntry {
+  name: string;
+  score: number;
+  nights_won: number;
+  achieved_at: string;
+  seed: number;
+}
+
+export interface LeaderboardFile {
+  entries: LeaderboardEntry[];
 }
 
 export interface InputState {
